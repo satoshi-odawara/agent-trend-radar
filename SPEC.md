@@ -72,6 +72,21 @@ owner/repoのGitHub API実データ(スター数・作成日)、および各社�
 
 ※ 項目は運用しながら追加・削除してよい。
 
+### 既知の制限(2026-09-06実データ通し実行で確認)
+
+`has_tests` / `has_observability_dep` はリポジトリ直下(ルート)のパス・
+マニフェストのみを見る設計のため、モノレポ構成のリポジトリでは実際には
+サブディレクトリ配下にテストや依存が存在していても false と判定される
+(20リポジトリ中16件で `has_tests=false`。例: astral-sh/ruff、
+langchain-ai/langchain、apache/airflow、supabase/supabase、
+crewAIInc/crewAI、continuedev/continue、microsoft/autogen。
+vercel/next.jsはルート直下に`tests`ではなく`test`(単数形)ディレクトリを
+持つため同様にfalseになる)。`has_security_policy`についても、GitHub組織の
+`.github`特別リポジトリにSECURITY.mdを置いて継承表示しているケース
+(apache/airflow、langchain-ai/langchain等)を拾えない。MVPでは
+CLAUDE.mdのシンプルさ優先方針に基づく意図的な割り切りとして許容している
+(Issue #14参照)が、データを解釈する際はこの制約を踏まえること。
+
 ### has_observability_depの判定対象パッケージ
 
 `pyproject.toml` / `requirements.txt` / `package.json` のうち存在するものを

@@ -222,12 +222,27 @@ MVP完成までのタスクリスト。各項目はGitHub Issue化する単位�
 - `SPEC.md`(必要に応じて見直しメモ・項目更新)
 
 **タスク**
-- [ ] `uv run scripts/collect.py` を実行し、全対象リポジトリの結果を
+- [x] `uv run scripts/collect.py` を実行し、全対象リポジトリの結果を
       収集する
-- [ ] `uv run scripts/report.py` で表を生成し、目視確認する
-- [ ] チェック項目・対象リポジトリの妥当性についてメモを残す
+- [x] `uv run scripts/report.py` で表を生成し、目視確認する
+- [x] チェック項目・対象リポジトリの妥当性についてメモを残す
       (SPEC.mdの見直し方針に沿って更新するかどうかの判断材料)
-- [ ] README.mdに実行手順を追記する
+- [x] README.mdに実行手順を追記する
+
+**振り返りメモ(次に見直すべき点)**
+- `has_tests`が20リポジトリ中16件でfalseになり、うち大半はモノレポ構成が
+  原因と実データで確認できた(既存Issue #14に評拠を追記、SPEC.mdに既知の
+  制限として明記済み)。「テストの有無」という指標としての説得力が現状
+  弱いため、post-MVPで#14に対応するかどうかが最優先の見直し候補。
+- `has_observability_dep`は20リポジトリ全件でfalse。判定対象パッケージが
+  LangChainエコシステム寄りの少数リストであることに加え、`has_tests`と
+  同じくルート直下のマニフェストしか見ていないため、モノレポでは
+  ワークスペース直下に依存が現れないケースがある。指標として機能して
+  いるか疑わしく、対象パッケージリストの拡充とあわせて要検討。
+- 対象リポジトリの選定(segment/収益化モデルの構成)自体は、20件とも
+  問題なく収集・分析が完走し、tool/adopter間で`has_tests`以外の項目
+  (has_agent_instructions, has_ci等)では傾向差も観測できたため、
+  現時点でのリスト見直しは不要と判断。
 
 **完了条件**: 生成された表を見て「次に何を見直すべきか」が言語化できて
 いる。
@@ -254,6 +269,20 @@ MVP完成までのタスクリスト。各項目はGitHub Issue化する単位�
       対応するなら「一段階だけ再帰的に探索する」「組織の.github repoも
       チェックする」等の拡張が考えられるが、いずれもスコープ拡大になる
       ため要検討
+
+      **#9実データ通し実行(2026-09-06)による裏付け**: 20リポジトリ中
+      16件で`has_tests=false`となり、うち少なくとも
+      astral-sh/ruff、langchain-ai/langchain、apache/airflow、
+      supabase/supabase、crewAIInc/crewAI、continuedev/continue、
+      microsoft/autogenの7件はGitHub API上で実際にモノレポ構造
+      (crates/、libs/、providers/、packages/等)であることを確認済み
+      (テスト自体が存在しないと確認できたのはyoheinakajima/babyagiのみ)。
+      さらにvercel/next.jsはルート直下に`tests`ではなく`test`(単数形)の
+      ディレクトリを持つため、モノレポ云々ではなく命名バリエーションのみで
+      falseになるケースも確認した(要修正時は対応パス候補に追加要検討)。
+      `has_security_policy`についてもapache/airflow、
+      langchain-ai/langchainの2件で予想通りfalseになることを確認した。
+      詳細はSPEC.md「チェック項目」の「既知の制限」を参照。
 
 ---
 
