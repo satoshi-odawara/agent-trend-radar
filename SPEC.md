@@ -68,9 +68,24 @@ owner/repoのGitHub API実データ(スター数・作成日)、および各社�
 | has_eval | evals/ / eval/ | エージェントの評価を行っているか |
 | has_ci | .github/workflows/ | CI/CDを回しているか |
 | has_security_policy | SECURITY.md | セキュリティ方針を明示しているか |
-| has_observability_dep | 依存にLangSmith等 | トレース/可観測性を導入しているか |
+| has_observability_dep | 依存に既知の可観測性パッケージ(下記) | トレース/可観測性を導入しているか |
 
 ※ 項目は運用しながら追加・削除してよい。
+
+### has_observability_depの判定対象パッケージ
+
+`pyproject.toml` / `requirements.txt` / `package.json` のうち存在するものを
+読み込み、以下のパッケージ名との文字列一致(大小文字無視)があれば true と
+判定する。複雑な依存パーサは作らない(CLAUDE.mdのシンプルさ優先方針に従う)。
+
+- `langsmith`(LangChain社、Python/npm両方に存在)
+- `langfuse`(Python/npm両方に存在)
+- `traceloop-sdk` / `traceloop`(OpenLLMetry)
+- `arize-phoenix`(Arize Phoenix、Python)
+- `helicone`(Python/npm両方に存在)
+- `promptlayer`(Python)
+
+※ このリストは運用しながら見直してよい(CLAUDE.mdの見直し方針を参照)。
 
 ## データスキーマ
 | 項目 | 内容 |

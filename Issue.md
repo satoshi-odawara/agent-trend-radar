@@ -85,16 +85,15 @@ MVP完成までのタスクリスト。各項目はGitHub Issue化する単位�
 - `tests/test_checks.py`(新規)
 
 **タスク**
-- [ ] `has_agent_instructions`: `CLAUDE.md` / `AGENTS.md` / `.cursorrules`
+- [x] `has_agent_instructions`: `CLAUDE.md` / `AGENTS.md` / `.cursorrules`
       いずれかの存在確認
-- [ ] `has_tests`: `tests/` の存在確認
-- [ ] `has_eval`: `evals/` / `eval/` の存在確認
-- [ ] `has_ci`: `.github/workflows/` の存在確認
-- [ ] `has_security_policy`: `SECURITY.md` の存在確認
-- [ ] `has_observability_dep`: マニフェストファイル
+- [x] `has_tests`: `tests/` の存在確認
+- [x] `has_eval`: `evals/` / `eval/` の存在確認
+- [x] `has_ci`: `.github/workflows/` の存在確認
+- [x] `has_security_policy`: `SECURITY.md` の存在確認
+- [x] `has_observability_dep`: マニフェストファイル
       (`pyproject.toml`/`package.json`/`requirements.txt`)を読み込み、
-      既知の観測可能性関連パッケージ名との文字列一致で判定
-      (Development_plan.mdのオープンな論点を参照)
+      既知の観測可能性関連パッケージ名(SPEC.md記載の6件)との文字列一致で判定
 
 **完了条件**: 各関数が既知の実在リポジトリに対して期待通りの真偽値を
 返すことを手動確認済み。
@@ -139,7 +138,9 @@ MVP完成までのタスクリスト。各項目はGitHub Issue化する単位�
 **タスク**
 - [ ] `uv run scripts/collect.py` のようなエントリポイントを作成
 - [ ] #2の対象リポジトリ設定を読み込む
-- [ ] 各リポジトリに対し#4のチェックを実行
+- [ ] #4で実装した6項目のチェック関数をまとめて実行する集約処理を実装する
+      (#4では個々の判定関数のみを実装し、集約は#6の責務とした)
+- [ ] 各リポジトリに対し上記の集約処理を実行
 - [ ] #5の保存処理を呼び出す
 - [ ] 実行ログ(進捗・エラー)を標準出力に出す
 
@@ -203,3 +204,15 @@ MVP完成までのタスクリスト。各項目はGitHub Issue化する単位�
 - [ ] #10 レート制限・エラーハンドリングの強化
 - [ ] #11 LLMによる要約・記事生成
 - [ ] #12 対象リポジトリ追加・入れ替えのフロー整備
+- [ ] #13 モノレポ/組織継承ファイルの扱い見直し(#4実装中に発見)
+      トップレベル直下のみのパス存在チェックでは、モノレポ構成の
+      リポジトリ(langchain-ai/langchain, apache/airflow等)で実際には
+      サブディレクトリ配下にtests/があっても`has_tests=false`になる。
+      また`SECURITY.md`がGitHub組織の`.github`特別リポジトリに置かれ
+      継承表示されているケース(apache/airflow, langchain-ai/langchain等)
+      も、対象リポジトリ自体には存在しないため`has_security_policy=false`
+      になる。MVPでは意図的な割り切り(CLAUDE.mdのスコープ方針)として
+      許容しているが、結果を解釈する際にこの制約を明記する必要がある。
+      対応するなら「一段階だけ再帰的に探索する」「組織の.github repoも
+      チェックする」等の拡張が考えられるが、いずれもスコープ拡大になる
+      ため要検討
