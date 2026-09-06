@@ -150,11 +150,11 @@ MVP完成までのタスクリスト。各項目はGitHub Issue化する単位�
 - `.gitignore`(`data/*.db` 追加、必要なら)
 
 **タスク**
-- [ ] `repo_checks` テーブルのスキーマ定義(repo, segment, monetization_model,
+- [x] `repo_checks` テーブルのスキーマ定義(repo, segment, monetization_model,
       checked_at, #4/#5の各チェック項目キー)
-- [ ] テーブル作成処理(存在しなければ作成)
-- [ ] 1リポジトリ分の結果をINSERTする関数
-- [ ] SQLiteファイルの保存先を決定(`.gitignore`対象であることを確認)
+- [x] テーブル作成処理(存在しなければ作成)
+- [x] 1リポジトリ分の結果をINSERTする関数
+- [x] SQLiteファイルの保存先を決定(`.gitignore`対象であることを確認)
 
 **完了条件**: スクリプトを2回実行すると、レコードが2回分(実行日ごと)
 蓄積されることを確認できる。
