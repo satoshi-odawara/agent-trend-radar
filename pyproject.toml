@@ -1,0 +1,20 @@
+[project]
+name = "agent-trend-radar"
+version = "0.1.0"
+description = "AIエージェント活用実態を公開リポジトリのファイル存在分析からサーベイするプロジェクト"
+authors = [
+    { name = "Satoshi Odawara", email = "balloonkozo@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "requests>=2.34.2",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.30,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
