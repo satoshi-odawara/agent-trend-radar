@@ -87,6 +87,27 @@ owner/repoのGitHub API実データ(スター数・作成日)、および各社�
 
 ※ このリストは運用しながら見直してよい(CLAUDE.mdの見直し方針を参照)。
 
+## CLAUDE.md/AGENTS.md内容分析(構造ベース)
+
+`has_agent_instructions`とは別に、CLAUDE.md/AGENTS.mdの中身についても
+ルールベースで分析する(LLMは使わない)。CLAUDE.mdとAGENTS.mdの両方が
+存在する場合は内容を連結した上で1回分析する。どちらも存在しない場合は
+`agent_doc_char_count`=0、`agent_doc_heading_count`=0、その他の真偽値項目は
+すべてfalseとする。
+
+| 項目キー | 何が分かるか | 判定方法 |
+|---|---|---|
+| agent_doc_char_count | 内容の充実度 | 文字数(数値) |
+| agent_doc_heading_count | 構成の複雑さ | Markdown見出し(`#`で始まる行)の数(数値) |
+| agent_doc_has_code_block | 具体的なコマンド例があるか | \`\`\`コードブロックの有無 |
+| agent_doc_mentions_test | テスト実行方法への言及 | キーワード一致(大小文字無視): test, pytest, jest, vitest |
+| agent_doc_mentions_lint | Lint/フォーマットへの言及 | キーワード一致: lint, ruff, eslint, prettier |
+| agent_doc_mentions_security | セキュリティ上の注意点への言及 | キーワード一致: security, secret, credential, vulnerability |
+| agent_doc_mentions_commit_convention | コミット規約への言及 | キーワード一致: commit message, conventional commit |
+| agent_doc_mentions_tool_usage | Skill/MCP/サブエージェント等の拡張機能の使い方への言及 | キーワード一致: mcp, skill, subagent, slash command, hook, tool use, function calling |
+
+※ このリストは運用しながら見直してよい(CLAUDE.mdの見直し方針を参照)。
+
 ## データスキーマ
 | 項目 | 内容 |
 |---|---|
@@ -94,7 +115,8 @@ owner/repoのGitHub API実データ(スター数・作成日)、および各社�
 | segment | tool / adopter |
 | monetization_model | commercial_saas / big_corp_internal / nonprofit_foundation / individual_community |
 | checked_at | チェック実行日 |
-| (各チェック項目キー) | 真偽値(存在する=true) |
+| (ファイル存在系チェック項目キー) | 真偽値(存在する=true) |
+| (CLAUDE.md/AGENTS.md内容分析キー) | 数値(char_count/heading_count) または真偽値 |
 
 ## 保存形式
 - SQLite、テーブル名: `repo_checks`
