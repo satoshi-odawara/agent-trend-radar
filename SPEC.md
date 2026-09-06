@@ -12,15 +12,52 @@ agent-trend-radarが分析する対象と項目の仕様。見直し方針はCLA
 以下の観点で、比較が面白くなるよう手動で10〜20個を選ぶ。自動選定は作らない。
 - スター数(一定以上の実績があるもの)
 - プロジェクト開始日(新しい/枯れている の対比)
-- 企業プロジェクト vs 個人・コミュニティ(運用成熟度の差)
+- **収益化モデル(monetization_model)**: 商用圧力の有無・種類による運用成熟度の
+  差を見る軸。以下の4区分で分類する(企業/個人という組織形態の軸は、
+  Apache財団(非営利だがOrganization)や個人発→企業化の例(Ruff/Bun)で
+  実態と乖離するため廃止した)
+  - `commercial_saas`(商用SaaS展開済み): OSSに加え商用の有料プラン/
+    エンタープライズ版が実在する
+  - `big_corp_internal`(大企業の内製・戦略的公開): 大企業が自社戦略の一環で
+    公開し、単体では収益化していない
+  - `nonprofit_foundation`(非営利財団運営): Apache Software Foundation等
+  - `individual_community`(個人・コミュニティ非営利): 商用展開のない個人/
+    コミュニティ運営
+- **区分(segment)**: `tool`(AIエージェント/LLMツール自体) と
+  `adopter`(AIエージェントを使って開発されている一般プロダクト。
+  CLAUDE.md/AGENTS.md等の採用が公知の事例のみを選ぶ)を半々程度で混在させ、
+  「ツール開発元自身の運用成熟度」と「ツールを使う側の運用成熟度」の両方が
+  比較できるようにする
+- 対象言語エコシステムはPython + TypeScript/JavaScriptに限定する
+  (`has_observability_dep`のマニフェスト解析対象を絞るため)
 
 ## 対象リポジトリリスト(初期・手動)
-※ 実際のリポジトリはMVP実装時に確定・追記する。以下は枠のみ。
 
-| リポジトリ (owner/repo) | 区分(企業/個人) | 備考 |
-|---|---|---|
-| (TBD) | | |
-| (TBD) | | |
+owner/repoのGitHub API実データ(スター数・作成日)、および各社の資金調達・
+商用プラン有無はWeb検索で裏取り済み(2026-09-06時点)。
+
+| owner/repo | segment | 収益化モデル | stars | 開始日 | 備考 |
+|---|---|---|---|---|---|
+| langchain-ai/langchain | tool | commercial_saas | 145,734 | 2022-10-17 | LangSmith/LangGraph Platformを商用展開 |
+| Significant-Gravitas/AutoGPT | tool | commercial_saas | 187,163 | 2023-03-16 | $12M調達・hosted Platform展開。価格詳細は非公開で確度はやや低め |
+| microsoft/autogen | tool | big_corp_internal | 60,827 | 2023-08-18 | Microsoft Researchの研究成果。単体商用製品ではない |
+| crewAIInc/crewAI | tool | commercial_saas | 58,133 | 2023-10-27 | $18M調達、Enterprise Agent Management Platformを課金展開 |
+| Aider-AI/aider | tool | individual_community | 48,774 | 2023-05-09 | Paul Gauthier個人開発、商用プラン確認できず |
+| cline/cline | tool | commercial_saas | 67,541 | 2024-07-06 | $32M調達、Cline Teams(エンタープライズ版)を展開 |
+| continuedev/continue | tool | commercial_saas | 35,784 | 2023-05-24 | $5.1M調達、Continue Hub(有料ティア)を展開 |
+| OpenHands/OpenHands | tool | commercial_saas | 86,292 | 2024-03-13 | All Hands AI社が$23.8M調達、OpenHands Cloudを課金展開 |
+| browser-use/browser-use | tool | commercial_saas | 112,416 | 2024-10-31 | $17M調達(YC出身)、Cloud APIを従量課金展開 |
+| yoheinakajima/babyagi | tool | individual_community | 22,356 | 2023-04-03 | 個人アカウント(User)所有、商用展開なし |
+| apache/airflow | adopter | nonprofit_foundation | 46,749 | 2015-04-13 | Apache Software Foundation運営 |
+| getsentry/sentry | adopter | commercial_saas | 44,732 | 2010-08-30 | 対象中最古(2010年〜)。商用SaaS(エラートラッキング)で著名 |
+| vercel/next.js | adopter | commercial_saas | 142,129 | 2016-10-05 | Vercelの商用ホスティングプラットフォームと連動 |
+| supabase/supabase | adopter | commercial_saas | 108,887 | 2019-10-12 | Supabase社の商用ホスティングDBサービス |
+| oven-sh/bun | adopter | commercial_saas | 95,891 | 2021-04-14 | $7M調達(Oven社)。サーバーレスホスティング事業を計画・展開中 |
+| sveltejs/svelte | adopter | individual_community | 88,060 | 2016-11-20 | コミュニティ運営、フレームワーク自体は非収益化。AGENTS.mdのみ採用 |
+| nuxt/nuxt | adopter | individual_community | 60,823 | 2016-10-26 | 2025年Vercelに買収されたNuxtLabsの有料製品群は無償OSS化済み |
+| astral-sh/ruff | adopter | commercial_saas | 49,511 | 2022-08-09 | Astral社が$4M調達、有料エンタープライズ版pyxを展開 |
+| colinhacks/zod | adopter | individual_community | 43,847 | 2020-03-07 | 個人アカウント(User)所有、商用展開なし |
+| remix-run/remix | adopter | big_corp_internal | 33,359 | 2020-10-26 | Shopifyが買収・内製。単体商用製品ではない |
 
 ## チェック項目(ファイル/ディレクトリの存在有無)
 
@@ -39,7 +76,8 @@ agent-trend-radarが分析する対象と項目の仕様。見直し方針はCLA
 | 項目 | 内容 |
 |---|---|
 | repo | owner/repo |
-| category | 企業 / 個人・コミュニティ |
+| segment | tool / adopter |
+| monetization_model | commercial_saas / big_corp_internal / nonprofit_foundation / individual_community |
 | checked_at | チェック実行日 |
 | (各チェック項目キー) | 真偽値(存在する=true) |
 

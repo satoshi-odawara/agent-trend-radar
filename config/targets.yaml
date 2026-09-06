@@ -1,0 +1,64 @@
+# 分析対象リポジトリ一覧。選定基準・裏取りデータはSPEC.mdを参照。
+# segment: tool(エージェント/LLMツール自体) / adopter(採用事例)
+# monetization_model: commercial_saas / big_corp_internal / nonprofit_foundation / individual_community
+targets:
+  - repo: langchain-ai/langchain
+    segment: tool
+    monetization_model: commercial_saas
+  - repo: Significant-Gravitas/AutoGPT
+    segment: tool
+    monetization_model: commercial_saas
+  - repo: microsoft/autogen
+    segment: tool
+    monetization_model: big_corp_internal
+  - repo: crewAIInc/crewAI
+    segment: tool
+    monetization_model: commercial_saas
+  - repo: Aider-AI/aider
+    segment: tool
+    monetization_model: individual_community
+  - repo: cline/cline
+    segment: tool
+    monetization_model: commercial_saas
+  - repo: continuedev/continue
+    segment: tool
+    monetization_model: commercial_saas
+  - repo: OpenHands/OpenHands
+    segment: tool
+    monetization_model: commercial_saas
+  - repo: browser-use/browser-use
+    segment: tool
+    monetization_model: commercial_saas
+  - repo: yoheinakajima/babyagi
+    segment: tool
+    monetization_model: individual_community
+  - repo: apache/airflow
+    segment: adopter
+    monetization_model: nonprofit_foundation
+  - repo: getsentry/sentry
+    segment: adopter
+    monetization_model: commercial_saas
+  - repo: vercel/next.js
+    segment: adopter
+    monetization_model: commercial_saas
+  - repo: supabase/supabase
+    segment: adopter
+    monetization_model: commercial_saas
+  - repo: oven-sh/bun
+    segment: adopter
+    monetization_model: commercial_saas
+  - repo: sveltejs/svelte
+    segment: adopter
+    monetization_model: individual_community
+  - repo: nuxt/nuxt
+    segment: adopter
+    monetization_model: individual_community
+  - repo: astral-sh/ruff
+    segment: adopter
+    monetization_model: commercial_saas
+  - repo: colinhacks/zod
+    segment: adopter
+    monetization_model: individual_community
+  - repo: remix-run/remix
+    segment: adopter
+    monetization_model: big_corp_internal

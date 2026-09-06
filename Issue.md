@@ -16,11 +16,11 @@ MVP完成までのタスクリスト。各項目はGitHub Issue化する単位�
 - `src/agent_trend_radar/__init__.py`(新規)
 
 **タスク**
-- [ ] `uv init` でプロジェクト作成(Python 3.12+指定)
-- [ ] ディレクトリ構成を決める(例: `src/agent_trend_radar/`, `scripts/`)
-- [ ] `.gitignore` 追加(`*.db`, `.env`, `__pycache__/` 等)
-- [ ] `pyproject.toml` に必要最低限の依存を追加(HTTPクライアント等)
-- [ ] `uv.lock` をコミット
+- [x] `uv init` でプロジェクト作成(Python 3.12+指定)
+- [x] ディレクトリ構成を決める(例: `src/agent_trend_radar/`, `scripts/`)
+- [x] `.gitignore` 追加(`*.db`, `.env`, `__pycache__/` 等)
+- [x] `pyproject.toml` に必要最低限の依存を追加(HTTPクライアント等)
+- [x] `uv.lock` をコミット
 
 **完了条件**: `uv run python -c "print('ok')"` が通る状態でコミットされて
 いる。
@@ -38,10 +38,11 @@ MVP完成までのタスクリスト。各項目はGitHub Issue化する単位�
 - `config/targets.yaml`(新規)
 
 **タスク**
-- [ ] SPEC.mdの選定基準(スター数/開始日/企業・個人)に沿って候補を洗い出す
-- [ ] 企業プロジェクト・個人プロジェクトのバランスを確認
-- [ ] SPEC.mdの表を更新(owner/repo, 区分, 備考)
-- [ ] 対象リポジトリを設定ファイル化(例: `config/targets.yaml` or `.json`)
+- [x] SPEC.mdの選定基準(スター数/開始日/収益化モデル)に沿って候補を洗い出す
+- [x] 収益化モデル(commercial_saas/big_corp_internal/nonprofit_foundation/
+      individual_community)の構成バランスを確認
+- [x] SPEC.mdの表を更新(owner/repo, segment, 収益化モデル, 備考)
+- [x] 対象リポジトリを設定ファイル化(例: `config/targets.yaml` or `.json`)
 
 **完了条件**: SPEC.mdの表が埋まっており、同じリストがスクリプトから読み込
 める形式でリポジトリ内に存在する。
