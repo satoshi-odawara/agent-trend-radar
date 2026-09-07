@@ -64,7 +64,7 @@ owner/repoのGitHub API実データ(スター数・作成日)、および各社�
 | 項目キー | 対象パス例 | 何が分かるか |
 |---|---|---|
 | has_agent_instructions | CLAUDE.md / AGENTS.md / .cursorrules | AIエージェントへの指示を管理しているか |
-| has_tests | tests/ | テストを備えているか |
+| has_tests | tests/ または test/(リポジトリ内の任意の深さ) | テストを備えているか |
 | has_eval | evals/ / eval/ | エージェントの評価を行っているか |
 | has_ci | .github/workflows/ | CI/CDを回しているか |
 | has_security_policy | SECURITY.md | セキュリティ方針を明示しているか |
@@ -72,20 +72,25 @@ owner/repoのGitHub API実データ(スター数・作成日)、および各社�
 
 ※ 項目は運用しながら追加・削除してよい。
 
-### 既知の制限(2026-09-06実データ通し実行で確認)
+### 既知の制限
 
-`has_tests` / `has_observability_dep` はリポジトリ直下(ルート)のパス・
-マニフェストのみを見る設計のため、モノレポ構成のリポジトリでは実際には
-サブディレクトリ配下にテストや依存が存在していても false と判定される
-(20リポジトリ中16件で `has_tests=false`。例: astral-sh/ruff、
-langchain-ai/langchain、apache/airflow、supabase/supabase、
-crewAIInc/crewAI、continuedev/continue、microsoft/autogen。
-vercel/next.jsはルート直下に`tests`ではなく`test`(単数形)ディレクトリを
-持つため同様にfalseになる)。`has_security_policy`についても、GitHub組織の
-`.github`特別リポジトリにSECURITY.mdを置いて継承表示しているケース
-(apache/airflow、langchain-ai/langchain等)を拾えない。MVPでは
-CLAUDE.mdのシンプルさ優先方針に基づく意図的な割り切りとして許容している
-(Issue #14参照)が、データを解釈する際はこの制約を踏まえること。
+`has_observability_dep` はリポジトリ直下(ルート)のマニフェストのみを
+見る設計のため、モノレポ構成のリポジトリでワークスペース配下の
+サブパッケージにのみ依存が宣言されているケースを検知できない。また
+対象パッケージがLangChainエコシステム寄りの少数リストであるため、
+AI開発エージェントを使って開発しているだけでLLMアプリ自体は作っていない
+adopterセグメントには概念的に適用対象外(Issue #16参照)。
+
+`has_security_policy` は対象リポジトリ自体のSECURITY.mdのみを見る設計の
+ため、GitHub組織の`.github`特別リポジトリに置いて継承表示している
+ケース(apache/airflow、langchain-ai/langchain等)を拾えない。MVPでは
+CLAUDE.mdのシンプルさ優先方針に基づく意図的な割り切りとして許容する
+(Issue #14でこの制限は対応せずクローズ)。
+
+`has_tests`はモノレポ構成での検知漏れ・命名バリエーション(`tests`/`test`)
+の問題が過去にあったが、Git Trees API(`recursive=1`)による全深度探索に
+2026-09-07実装のIssue #14で対応済み(20リポジトリ中19件がtrueに改善、
+falseはyoheinakajima/babyagiのみで実態と一致)。
 
 ### has_observability_depの判定対象パッケージ
 

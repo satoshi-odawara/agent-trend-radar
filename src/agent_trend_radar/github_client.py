@@ -45,9 +45,33 @@ class GitHubClient:
             )
         return base64.b64decode(data["content"]).decode("utf-8")
 
+    def get_directory_names(self, repo: str) -> set[str]:
+        """リポジトリ全体(任意の深さ)に存在するディレクトリ名(basename)の集合を返す。
+
+        Git Trees APIのrecursive=1を使い1リクエストで全深度を取得する。
+        モノレポ構成でルート直下に対象ディレクトリがないケースを検知するため
+        (#14参照)。
+        """
+        owner, name = repo.split("/", 1)
+        url = f"{GITHUB_API_BASE}/repos/{owner}/{name}/git/trees/HEAD?recursive=1"
+        response = self._request(url)
+        if response.status_code != 200:
+            raise GitHubClientError(
+                f"GitHub APIエラー: {repo}のツリー取得 -> {response.status_code}"
+            )
+        data = response.json()
+        return {
+            entry["path"].rsplit("/", 1)[-1]
+            for entry in data.get("tree", [])
+            if entry.get("type") == "tree"
+        }
+
     def _get_contents(self, repo: str, path: str) -> requests.Response:
         owner, name = repo.split("/", 1)
         url = f"{GITHUB_API_BASE}/repos/{owner}/{name}/contents/{path}"
+        return self._request(url)
+
+    def _request(self, url: str) -> requests.Response:
         response = self._session.get(url, headers=self._headers())
         if response.status_code == 403 and response.headers.get("X-RateLimit-Remaining") == "0":
             reset_at = int(response.headers.get("X-RateLimit-Reset", "0"))

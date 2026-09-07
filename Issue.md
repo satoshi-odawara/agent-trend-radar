@@ -261,18 +261,15 @@ MVP完成までのタスクリスト。各項目はGitHub Issue化する単位�
       (MVP品質評価で発見、詳細は末尾セクション参照)
 - [ ] #17 分析結果を要約・記事化する際の統計的な注意点整理
       (MVP品質評価で発見、#12着手時の前提条件、詳細は末尾セクション参照)
-- [ ] #14 モノレポ/組織継承ファイルの扱い見直し(#4実装中に発見)
+- [x] #14 モノレポ/組織継承ファイルの扱い見直し(#4実装中に発見、
+      2026-09-07 has_tests対応完了・has_security_policyは対応せずクローズ)
       トップレベル直下のみのパス存在チェックでは、モノレポ構成の
       リポジトリ(langchain-ai/langchain, apache/airflow等)で実際には
       サブディレクトリ配下にtests/があっても`has_tests=false`になる。
       また`SECURITY.md`がGitHub組織の`.github`特別リポジトリに置かれ
       継承表示されているケース(apache/airflow, langchain-ai/langchain等)
       も、対象リポジトリ自体には存在しないため`has_security_policy=false`
-      になる。MVPでは意図的な割り切り(CLAUDE.mdのスコープ方針)として
-      許容しているが、結果を解釈する際にこの制約を明記する必要がある。
-      対応するなら「一段階だけ再帰的に探索する」「組織の.github repoも
-      チェックする」等の拡張が考えられるが、いずれもスコープ拡大になる
-      ため要検討
+      になる。
 
       **#9実データ通し実行(2026-09-06)による裏付け**: 20リポジトリ中
       16件で`has_tests=false`となり、うち少なくとも
@@ -283,10 +280,21 @@ MVP完成までのタスクリスト。各項目はGitHub Issue化する単位�
       (テスト自体が存在しないと確認できたのはyoheinakajima/babyagiのみ)。
       さらにvercel/next.jsはルート直下に`tests`ではなく`test`(単数形)の
       ディレクトリを持つため、モノレポ云々ではなく命名バリエーションのみで
-      falseになるケースも確認した(要修正時は対応パス候補に追加要検討)。
-      `has_security_policy`についてもapache/airflow、
-      langchain-ai/langchainの2件で予想通りfalseになることを確認した。
-      詳細はSPEC.md「チェック項目」の「既知の制限」を参照。
+      falseになるケースも確認した。`has_security_policy`についても
+      apache/airflow、langchain-ai/langchainの2件で予想通りfalseになる
+      ことを確認した。
+
+      **対応内容(2026-09-07)**: `has_tests`はGit Trees API
+      (`GET /repos/{owner}/{repo}/git/trees/HEAD?recursive=1`)で
+      リポジトリ全体のディレクトリ名を1リクエストで取得し、任意の深さで
+      `tests`または`test`という名前のディレクトリが存在するかを判定する
+      方式に変更(`github_client.py`の`get_directory_names`、
+      `checks.py`の`has_tests`)。対象20リポジトリいずれもGitHub側の
+      truncated制限(7MB/10万エントリ)には該当しないことを事前確認済み。
+      実データ再実行の結果、20リポジトリ中19件がtrueに改善(false は
+      実際にテストが存在しないyoheinakajima/babyagiのみ)。
+      `has_security_policy`の組織`.github`継承問題は対応せず、SPEC.mdの
+      既知の制限として文書化のみでクローズすることをユーザーと合意した。
 
 ---
 

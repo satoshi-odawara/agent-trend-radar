@@ -5,6 +5,7 @@ import pytest
 from agent_trend_radar.github_client import GitHubClient, GitHubClientError
 
 CONTENTS_URL = "https://api.github.com/repos/owner/repo/contents/CLAUDE.md"
+TREE_URL = "https://api.github.com/repos/owner/repo/git/trees/HEAD?recursive=1"
 
 
 class FakeResponse:
@@ -77,6 +78,29 @@ def test_get_file_content_returns_none_when_missing():
     client = GitHubClient(token="dummy", session=session)
 
     assert client.get_file_content("owner/repo", "CLAUDE.md") is None
+
+
+def test_get_directory_names_returns_basenames_at_any_depth():
+    tree = {
+        "tree": [
+            {"path": "libs", "type": "tree"},
+            {"path": "libs/core", "type": "tree"},
+            {"path": "libs/core/tests", "type": "tree"},
+            {"path": "libs/core/tests/test_foo.py", "type": "blob"},
+        ]
+    }
+    session = FakeSession({TREE_URL: FakeResponse(200, json_data=tree)})
+    client = GitHubClient(token="dummy", session=session)
+
+    assert client.get_directory_names("owner/repo") == {"libs", "core", "tests"}
+
+
+def test_get_directory_names_raises_on_unexpected_status():
+    session = FakeSession({TREE_URL: FakeResponse(500)})
+    client = GitHubClient(token="dummy", session=session)
+
+    with pytest.raises(GitHubClientError):
+        client.get_directory_names("owner/repo")
 
 
 def test_uses_token_from_env_var(monkeypatch):

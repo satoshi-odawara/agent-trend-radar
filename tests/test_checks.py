@@ -2,15 +2,19 @@ from agent_trend_radar import checks
 
 
 class FakeGitHubClient:
-    def __init__(self, existing_paths=None, file_contents=None):
+    def __init__(self, existing_paths=None, file_contents=None, directory_names=None):
         self._existing_paths = existing_paths or set()
         self._file_contents = file_contents or {}
+        self._directory_names = directory_names or set()
 
     def path_exists(self, repo, path):
         return path in self._existing_paths
 
     def get_file_content(self, repo, path):
         return self._file_contents.get(path)
+
+    def get_directory_names(self, repo):
+        return self._directory_names
 
 
 def test_has_agent_instructions_true_for_claude_md():
@@ -29,12 +33,22 @@ def test_has_agent_instructions_false_when_none_exist():
 
 
 def test_has_tests_true_when_tests_dir_exists():
-    client = FakeGitHubClient(existing_paths={"tests"})
+    client = FakeGitHubClient(directory_names={"tests"})
+    assert checks.has_tests(client, "owner/repo") is True
+
+
+def test_has_tests_true_when_test_dir_exists():
+    client = FakeGitHubClient(directory_names={"test"})
+    assert checks.has_tests(client, "owner/repo") is True
+
+
+def test_has_tests_true_when_nested_in_monorepo():
+    client = FakeGitHubClient(directory_names={"libs", "core", "tests"})
     assert checks.has_tests(client, "owner/repo") is True
 
 
 def test_has_tests_false_when_missing():
-    client = FakeGitHubClient()
+    client = FakeGitHubClient(directory_names={"src", "docs"})
     assert checks.has_tests(client, "owner/repo") is False
 
 
