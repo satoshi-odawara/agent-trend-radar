@@ -27,9 +27,12 @@ AIエージェントツールが実際のソフトウェア開発で「どう使
   収集の決定性と同じ)
 - 保存: SQLite(ファイルベース、DBコスト0円)
 - 自動実行: GitHub Actions(週次cron)
-- LLM利用: 要約・記事生成、およびCLAUDE.md/AGENTS.mdの内容分析(ルール
-  ベース分析の後継、reports/agent_doc_analysis_validation.md参照)に限定
-  (低コスト優先のモデルを使う)。MVPでは未使用でよい
+- LLM利用: 要約・記事生成はこのリポジトリのスコープ外とし、Claude Project
+  の専用チャットスペース(考察のみを行う場)で実施する(実装コンテキストの
+  混入を避けるため中止した経緯はIssue.md #12参照)。CLAUDE.md/AGENTS.md
+  の内容分析へのLLM利用(ルールベース分析の後継、
+  reports/agent_doc_analysis_validation.md参照)は実施するか検討中で未決定
+  (Issue.md #15参照)。実施する場合は低コスト優先のモデルを使う
 
 ## 対象プロジェクト・チェック項目
 詳細な分析対象リポジトリ・チェック項目は @SPEC.md を参照。
