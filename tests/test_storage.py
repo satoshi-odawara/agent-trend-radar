@@ -17,6 +17,10 @@ SAMPLE_CHECKS = {
     "agent_doc_mentions_security": False,
     "agent_doc_mentions_commit_convention": False,
     "agent_doc_mentions_tool_usage": True,
+    "agent_doc_mentions_repo_structure": True,
+    "agent_doc_mentions_boundaries": False,
+    "agent_doc_mentions_pr_review": False,
+    "agent_doc_mentions_release_process": False,
 }
 
 

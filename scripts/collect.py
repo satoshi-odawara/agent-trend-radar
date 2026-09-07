@@ -1,11 +1,12 @@
 from datetime import datetime, timezone
 
-from agent_trend_radar import agent_doc_analysis, checks, config, storage
+from agent_trend_radar import agent_doc_analysis, checks, config, llm_content_analysis, storage
 from agent_trend_radar.github_client import GitHubClient
 
 
 def run_checks_for_repo(client: GitHubClient, repo: str) -> dict:
     content = agent_doc_analysis.fetch_agent_doc_content(client, repo)
+    llm_themes = llm_content_analysis.classify_agent_doc_themes(content)
     return {
         "has_agent_instructions": checks.has_agent_instructions(client, repo),
         "has_tests": checks.has_tests(client, repo),
@@ -22,6 +23,10 @@ def run_checks_for_repo(client: GitHubClient, repo: str) -> dict:
             agent_doc_analysis.agent_doc_mentions_commit_convention(content)
         ),
         "agent_doc_mentions_tool_usage": agent_doc_analysis.agent_doc_mentions_tool_usage(content),
+        "agent_doc_mentions_repo_structure": llm_themes["agent_doc_mentions_repo_structure"],
+        "agent_doc_mentions_boundaries": llm_themes["agent_doc_mentions_boundaries"],
+        "agent_doc_mentions_pr_review": llm_themes["agent_doc_mentions_pr_review"],
+        "agent_doc_mentions_release_process": llm_themes["agent_doc_mentions_release_process"],
     }
 
 

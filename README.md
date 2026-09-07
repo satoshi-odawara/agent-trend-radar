@@ -12,6 +12,11 @@ GitHub APIのレート制限緩和のため、`GITHUB_TOKEN`環境変数にperso
 tokenを設定することを推奨する(未設定でも動作するが、未認証のレート制限
 にすぐ達する)。
 
+CLAUDE.md/AGENTS.mdのLLMによるテーマ分類(Issue #15)には、Claude Code CLI
+(`claude`コマンド、v2.1.259+)がインストール済みでログイン済みであること
+が必要。Anthropic APIキー(`ANTHROPIC_API_KEY`)は不要で、Claude Code CLIの
+サブスクリプション認証をそのまま利用する(追加のAPI課金は発生しない)。
+
 ## 実行方法
 
 対象リポジトリ(`config/targets.yaml`、SPEC.md参照)に対しチェックを実行し、

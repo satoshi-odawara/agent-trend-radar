@@ -44,7 +44,7 @@ def render_markdown(rows: list[tuple]) -> str:
     return "\n".join(lines)
 
 
-def render_stats(rows: list[tuple]) -> str:
+def render_numeric_stats(rows: list[tuple]) -> str:
     """segment x monetization_modelでグループ化したn/min/中央値/平均/maxを出力する。
 
     平均値だけでは外れ値に強く引っ張られるため(#17参照)、中央値・分布も
@@ -80,6 +80,49 @@ def render_stats(rows: list[tuple]) -> str:
             )
         sections.append("\n".join(lines))
     return "\n\n".join(sections)
+
+
+def render_boolean_stats(rows: list[tuple]) -> str:
+    """真偽値項目をsegment x monetization_modelでグループ化したtrue件数/true率を出力する。
+
+    「分散がなく比較材料として機能していない」項目(天井/床効果、#16・#20
+    参照)を機械的に検出するための評価方法(#15の有効性確認を兼ねる)。
+    """
+    segment_idx = ALL_COLUMNS.index("segment")
+    monetization_idx = ALL_COLUMNS.index("monetization_model")
+    boolean_columns = [col for col in storage.CHECK_COLUMNS if col not in NUMERIC_COLUMNS]
+
+    sections = []
+    for column in boolean_columns:
+        col_idx = ALL_COLUMNS.index(column)
+        groups: dict[tuple[str, str], list[bool]] = {}
+        for row in rows:
+            key = (row[segment_idx], row[monetization_idx])
+            groups.setdefault(key, []).append(bool(row[col_idx]))
+
+        lines = [
+            f"## {column}",
+            "| segment | monetization_model | n | true | true率 |",
+            "| --- | --- | --- | --- | --- |",
+        ]
+        for (segment, monetization_model), values in sorted(groups.items()):
+            n = len(values)
+            true_n = sum(values)
+            lines.append(
+                "| {segment} | {monetization_model} | {n} | {true_n} | {rate:.0%} |".format(
+                    segment=segment,
+                    monetization_model=monetization_model,
+                    n=n,
+                    true_n=true_n,
+                    rate=(true_n / n) if n else 0,
+                )
+            )
+        sections.append("\n".join(lines))
+    return "\n\n".join(sections)
+
+
+def render_stats(rows: list[tuple]) -> str:
+    return render_numeric_stats(rows) + "\n\n" + render_boolean_stats(rows)
 
 
 def main() -> None:

@@ -108,13 +108,16 @@ falseはyoheinakajima/babyagiのみで実態と一致)。
 一致」という測り方が原理的に噛み合っていなかったと判断し、いったん
 廃止した。測り方の再設計はIssue #18で検討する。
 
-## CLAUDE.md/AGENTS.md内容分析(構造ベース)
+## CLAUDE.md/AGENTS.md内容分析
 
 `has_agent_instructions`とは別に、CLAUDE.md/AGENTS.mdの中身についても
-ルールベースで分析する(LLMは使わない)。CLAUDE.mdとAGENTS.mdの両方が
-存在する場合は内容を連結した上で1回分析する。どちらも存在しない場合は
-`agent_doc_char_count`=0、`agent_doc_heading_count`=0、その他の真偽値項目は
-すべてfalseとする。
+分析する。CLAUDE.mdとAGENTS.mdの両方が存在する場合は内容を連結した上で
+1回分析する。どちらも存在しない場合は`agent_doc_char_count`=0、
+`agent_doc_heading_count`=0、その他の真偽値項目はすべてfalseとする。
+
+### ルールベース分析(構造ベース)
+
+キーワード一致・文字数・見出し数によるルールベース分析(LLMは使わない)。
 
 | 項目キー | 何が分かるか | 判定方法 |
 |---|---|---|
@@ -126,6 +129,21 @@ falseはyoheinakajima/babyagiのみで実態と一致)。
 | agent_doc_mentions_security | セキュリティ上の注意点への言及 | キーワード一致: security, secret, credential, vulnerability |
 | agent_doc_mentions_commit_convention | コミット規約への言及 | キーワード一致: commit message, conventional commit |
 | agent_doc_mentions_tool_usage | Skill/MCP/サブエージェント等の拡張機能の使い方への言及 | キーワード一致: mcp, skill, subagent, slash command, hook, tool use, function calling |
+
+### LLMベース分析(Issue #15)
+
+`reports/agent_doc_analysis_validation.md`の発見3で指摘された、キーワード
+一致では表現のバリエーションを拾いきれない4テーマをLLMで分類する。
+Anthropic APIの従量課金ではなく、Claude Code CLIのヘッドレス実行
+(`claude -p`、サブスクリプション認証)で完結させる
+(`src/agent_trend_radar/llm_content_analysis.py`)。
+
+| 項目キー | 何が分かるか | 判定方法 |
+|---|---|---|
+| agent_doc_mentions_repo_structure | リポジトリ構成・モノレポの境界説明への言及 | LLM分類 |
+| agent_doc_mentions_boundaries | エージェントがしてはいけないことの境界線への言及 | LLM分類 |
+| agent_doc_mentions_pr_review | PRレビュー基準・人間チェックポイントへの言及 | LLM分類 |
+| agent_doc_mentions_release_process | リリース/デプロイ手順への言及 | LLM分類 |
 
 ※ このリストは運用しながら見直してよい(CLAUDE.mdの見直し方針を参照)。
 
