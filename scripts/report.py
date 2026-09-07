@@ -1,5 +1,6 @@
 import argparse
 import csv
+import statistics
 import sys
 
 from agent_trend_radar import storage
@@ -43,12 +44,50 @@ def render_markdown(rows: list[tuple]) -> str:
     return "\n".join(lines)
 
 
+def render_stats(rows: list[tuple]) -> str:
+    """segment x monetization_modelでグループ化したn/min/中央値/平均/maxを出力する。
+
+    平均値だけでは外れ値に強く引っ張られるため(#17参照)、中央値・分布も
+    併記する。
+    """
+    segment_idx = ALL_COLUMNS.index("segment")
+    monetization_idx = ALL_COLUMNS.index("monetization_model")
+
+    sections = []
+    for column in sorted(NUMERIC_COLUMNS):
+        col_idx = ALL_COLUMNS.index(column)
+        groups: dict[tuple[str, str], list[int]] = {}
+        for row in rows:
+            key = (row[segment_idx], row[monetization_idx])
+            groups.setdefault(key, []).append(row[col_idx])
+
+        lines = [
+            f"## {column}",
+            "| segment | monetization_model | n | min | median | mean | max |",
+            "| --- | --- | --- | --- | --- | --- | --- |",
+        ]
+        for (segment, monetization_model), values in sorted(groups.items()):
+            lines.append(
+                "| {segment} | {monetization_model} | {n} | {min} | {median:.0f} | {mean:.0f} | {max} |".format(
+                    segment=segment,
+                    monetization_model=monetization_model,
+                    n=len(values),
+                    min=min(values),
+                    median=statistics.median(values),
+                    mean=statistics.mean(values),
+                    max=max(values),
+                )
+            )
+        sections.append("\n".join(lines))
+    return "\n\n".join(sections)
+
+
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description="repo_checksの結果をレポート出力する")
     parser.add_argument(
         "--format",
-        choices=["markdown", "csv"],
+        choices=["markdown", "csv", "stats"],
         default="markdown",
         help="出力形式(既定: markdown)",
     )
@@ -63,6 +102,8 @@ def main() -> None:
         writer = csv.writer(sys.stdout, lineterminator="\n")
         writer.writerow(ALL_COLUMNS)
         writer.writerows(rows)
+    elif args.format == "stats":
+        print(render_stats(rows))
     else:
         print(render_markdown(rows))
 
