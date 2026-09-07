@@ -9,7 +9,6 @@ SAMPLE_CHECKS = {
     "has_eval": False,
     "has_ci": True,
     "has_security_policy": False,
-    "has_observability_dep": False,
     "agent_doc_char_count": 1234,
     "agent_doc_heading_count": 5,
     "agent_doc_has_code_block": True,

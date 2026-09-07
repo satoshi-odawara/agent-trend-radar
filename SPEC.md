@@ -29,7 +29,9 @@ agent-trend-radarが分析する対象と項目の仕様。見直し方針はCLA
   「ツール開発元自身の運用成熟度」と「ツールを使う側の運用成熟度」の両方が
   比較できるようにする
 - 対象言語エコシステムはPython + TypeScript/JavaScriptに限定する
-  (`has_observability_dep`のマニフェスト解析対象を絞るため)
+  (マニフェストファイル(pyproject.toml/package.json等)を用いる将来の
+  分析対象を絞るため。当初は`has_observability_dep`のためだったが、
+  同項目は#16で廃止した)
 
 ## 対象リポジトリリスト(初期・手動)
 
@@ -68,18 +70,10 @@ owner/repoのGitHub API実データ(スター数・作成日)、および各社�
 | has_eval | evals/ / eval/ | エージェントの評価を行っているか |
 | has_ci | .github/workflows/ | CI/CDを回しているか |
 | has_security_policy | SECURITY.md | セキュリティ方針を明示しているか |
-| has_observability_dep | 依存に既知の可観測性パッケージ(下記) | トレース/可観測性を導入しているか |
 
 ※ 項目は運用しながら追加・削除してよい。
 
 ### 既知の制限
-
-`has_observability_dep` はリポジトリ直下(ルート)のマニフェストのみを
-見る設計のため、モノレポ構成のリポジトリでワークスペース配下の
-サブパッケージにのみ依存が宣言されているケースを検知できない。また
-対象パッケージがLangChainエコシステム寄りの少数リストであるため、
-AI開発エージェントを使って開発しているだけでLLMアプリ自体は作っていない
-adopterセグメントには概念的に適用対象外(Issue #16参照)。
 
 `has_security_policy` は対象リポジトリ自体のSECURITY.mdのみを見る設計の
 ため、GitHub組織の`.github`特別リポジトリに置いて継承表示している
@@ -92,20 +86,27 @@ CLAUDE.mdのシンプルさ優先方針に基づく意図的な割り切りと�
 2026-09-07実装のIssue #14で対応済み(20リポジトリ中19件がtrueに改善、
 falseはyoheinakajima/babyagiのみで実態と一致)。
 
-### has_observability_depの判定対象パッケージ
+### 廃止した項目とその理由
 
-`pyproject.toml` / `requirements.txt` / `package.json` のうち存在するものを
-読み込み、以下のパッケージ名との文字列一致(大小文字無視)があれば true と
-判定する。複雑な依存パーサは作らない(CLAUDE.mdのシンプルさ優先方針に従う)。
+`has_observability_dep`(依存にLangSmith/Langfuse等の可観測性パッケージが
+あるか)は2026-09-07、Issue #16でMVP後の項目から廃止した。
 
-- `langsmith`(LangChain社、Python/npm両方に存在)
-- `langfuse`(Python/npm両方に存在)
-- `traceloop-sdk` / `traceloop`(OpenLLMetry)
-- `arize-phoenix`(Arize Phoenix、Python)
-- `helicone`(Python/npm両方に存在)
-- `promptlayer`(Python)
+測ろうとしていたこと自体(LLM/エージェントの実行時挙動を追跡できて
+いるか、というAIエージェント特有の運用実践)は今も妥当なテーマだが、
+「自リポジトリのマニフェストへの依存宣言」という測り方には構造的な
+限界があった。
 
-※ このリストは運用しながら見直してよい(CLAUDE.mdの見直し方針を参照)。
+- adopterセグメント(AI開発エージェントを使って開発しているだけで、
+  自らLLMアプリを作っているわけではないプロジェクト)には概念的に
+  適用対象外(10件中0件がtrue)。
+- 本来の対象であるtoolセグメント(LLM/エージェントフレームワーク開発元)
+  でも、フレームワークはLangSmith等との連携機能を"提供"するだけで、
+  自身がそれに"依存"するとは限らないため、実質機能しなかった
+  (10件中1件のみtrue)。
+
+「実行時の観測性」という測りたい実態と、「依存マニフェストの文字列
+一致」という測り方が原理的に噛み合っていなかったと判断し、いったん
+廃止した。測り方の再設計はIssue #18で検討する。
 
 ## CLAUDE.md/AGENTS.md内容分析(構造ベース)
 

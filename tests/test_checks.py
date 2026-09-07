@@ -2,16 +2,12 @@ from agent_trend_radar import checks
 
 
 class FakeGitHubClient:
-    def __init__(self, existing_paths=None, file_contents=None, directory_names=None):
+    def __init__(self, existing_paths=None, directory_names=None):
         self._existing_paths = existing_paths or set()
-        self._file_contents = file_contents or {}
         self._directory_names = directory_names or set()
 
     def path_exists(self, repo, path):
         return path in self._existing_paths
-
-    def get_file_content(self, repo, path):
-        return self._file_contents.get(path)
 
     def get_directory_names(self, repo):
         return self._directory_names
@@ -79,25 +75,3 @@ def test_has_security_policy_true_when_security_md_exists():
 def test_has_security_policy_false_when_missing():
     client = FakeGitHubClient()
     assert checks.has_security_policy(client, "owner/repo") is False
-
-
-def test_has_observability_dep_true_when_pyproject_mentions_known_package():
-    client = FakeGitHubClient(file_contents={"pyproject.toml": 'dependencies = ["langsmith"]'})
-    assert checks.has_observability_dep(client, "owner/repo") is True
-
-
-def test_has_observability_dep_true_case_insensitive_in_package_json():
-    client = FakeGitHubClient(
-        file_contents={"package.json": '{"dependencies": {"Langfuse": "^1.0.0"}}'}
-    )
-    assert checks.has_observability_dep(client, "owner/repo") is True
-
-
-def test_has_observability_dep_false_when_no_manifest_present():
-    client = FakeGitHubClient()
-    assert checks.has_observability_dep(client, "owner/repo") is False
-
-
-def test_has_observability_dep_false_when_manifest_has_no_known_package():
-    client = FakeGitHubClient(file_contents={"pyproject.toml": 'dependencies = ["requests"]'})
-    assert checks.has_observability_dep(client, "owner/repo") is False
