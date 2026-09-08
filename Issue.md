@@ -319,21 +319,22 @@ Issueは「実装型」「調査・検討型」いずれかのテンプレート
 - [ ] #13 対象リポジトリ追加・入れ替えのフロー整備
 - [x] #14 モノレポ/組織継承ファイルの扱い見直し — 2026-09-07
       has_tests対応完了・has_security_policyは対応せずクローズ
-- [ ] #15 LLMによるCLAUDE.md/AGENTS.md内容分析 — 2026-09-08 実装完了、
-      実データでの分散確認・スポットチェックが未了(詳細は末尾セクション参照)
+- [x] #15 LLMによるCLAUDE.md/AGENTS.md内容分析 — 2026-09-08 実装・実データ
+      検証(分散確認・スポットチェック)完了(詳細は末尾セクション参照)
 - [x] #16 has_observability_depのsegment適用範囲の見直し — 2026-09-07
       項目自体を廃止してクローズ
 - [x] #17 分析結果を要約・記事化する際の統計的な注意点整理 —
       2026-09-07対応完了
 - [ ] #18 可観測性指標の測り方の再設計(#16で発見)
-- [ ] #19 データをClaude Projectから参照しやすい公開形式の検討
-      (#12中止に伴い新設)
+- [ ] #19 データをClaude Projectから参照しやすい公開形式の検討 —
+      2026-09-08 実装・実データ生成完了、Claude Project側の接続確認待ち
+      (#12中止に伴い新設、詳細は末尾セクション参照)
 - [ ] #20 has_ci / agent_doc_has_code_blockの天井・床効果の見直し
       (MVP品質評価で発見、詳細は末尾セクション参照)
 - [ ] #21 高度なエージェント運用ツール導入の有無チェック項目の追加
       (#15議論中に発見)
-- [ ] #22 #19の公開データにCLAUDE.md/AGENTS.mdの本文を含める
-      (#15議論中に発見)
+- [x] #22 #19の公開データにCLAUDE.md/AGENTS.mdの本文を含める —
+      2026-09-08 #19に統合して実装完了(詳細は末尾セクション参照)
 - [ ] #23 PR品質・レビュー通過率・インシデント率等のアウトカム指標の
       収集検討(#15議論中に発見、未解決の方法論的課題あり)
 
@@ -362,7 +363,7 @@ LLM分類にClaude Code CLIのヘッドレス実行(`claude -p`)を採用した�
 
 **完了条件**: 着手時に別途定義する。
 
-**依存**: #7(完了済み)、#15(実装完了、実データ検証待ち)
+**依存**: #7(完了済み)、#15(完了済み)
 
 ---
 
@@ -525,26 +526,43 @@ CLI(`claude -p`+`claude-code-action`)の両方の実現性を調査した上で�
   陥っていないか)と、プロジェクト全体の品質担保(#20等の既存項目にも
   同じ評価方法を適用可能)を兼ねる
 
-**未検証の項目**(このセッションには`claude` CLIの実行認証環境がなく
-確認できなかった)
-- 20リポジトリに対する実行結果(新規4項目に実際に意味のある分散が
-  出るか)。`uv run scripts/collect.py`実行後、
-  `uv run scripts/report.py --format stats`の該当4項目のtrue率を確認
-  すること
-- validation report記載の既知の見逃し事例(astral-sh/ruffのPR規約、
-  oven-sh/bunのレビュー基準等)を、新規`agent_doc_mentions_pr_review`が
-  正しくtrueと判定できるかのスポットチェック
-- 1リポジトリあたりの実行時間・サブスクリプション利用枠の消費量の実測
-- `--permission-prompts none`がClaude Code v2.1.259+を要求する点の
-  バージョン確認
+**実データ検証(2026-09-08、GITHUB_TOKEN・claude CLI(v2.1.263)が利用
+できる環境で実施)**: 古いスキーマの`data/repo_checks.db`(#16以前、
+`has_observability_dep`が残存)を退避し、`uv run scripts/collect.py`を
+20リポジトリ全件に対して実行。エラーなく完走し(所要時間は
+`data/latest/`生成分も合わせて実測)、新規4項目を含む全21列でDBが
+再構築されたことを確認した。
+
+- **分散確認**(`uv run scripts/report.py --format stats`): 新規4項目は
+  いずれもsegment×monetization_model別に0%〜100%の幅のあるtrue率を
+  示し、`has_ci`(全グループ100%近辺、天井効果)とは対照的に比較材料
+  として機能していることを確認した(例:
+  `agent_doc_mentions_release_process`はadopter×commercial_saas 20%、
+  tool×big_corp_internal 0%など)
+- **既知の見逃し事例のスポットチェック**: `reports/
+  agent_doc_analysis_validation.md`が指摘していた2件
+  (astral-sh/ruffの"PR conventions"見出し、oven-sh/bunの"Landing PRs:
+  What Bun Reviewers Catch"見出し)は、旧`agent_doc_mentions_
+  commit_convention`(キーワード一致)では両者ともfalseのままだが、
+  新規`agent_doc_mentions_pr_review`はどちらも正しくtrueと判定した
+- 全20リポジトリのうちCLAUDE.md/AGENTS.mdを実際に保有していたのは16件
+  (`data/latest/agent_docs/`に16ファイル生成、4件
+  (microsoft/autogen, Aider-AI/aider, continuedev/continue,
+  yoheinakajima/babyagi)はスキップ)。これは
+  agent_doc_analysis_validation.mdの表(✓16件)と一致する
+  (同レポート本文中の「14件(70%)」という記述は数値が古い/誤りの
+  可能性があり、本Issueでは実測の16件を正とする)
+
+**副次的に見つけた修正**: `collect.py`/`publish.py`の`print()`出力が
+Windows環境でリダイレクト時に文字化けしていたため、`report.py`と同様に
+`sys.stdout.reconfigure(encoding="utf-8")`を追加した。
 
 **完了条件**:
 1. 実装・ユニットテスト(モック)が完了している(達成済み)
 2. 実データで新規4項目を実行し、天井/床効果(has_ci等と同じ問題)に
-   陥っていないことを`report.py --format stats`で確認する(未達、
-   `claude` CLI環境からの実行が必要)
+   陥っていないことを`report.py --format stats`で確認する(達成済み)
 3. 既知の見逃し事例のスポットチェックで、新規項目が意図通り機能して
-   いることを確認する(未達)
+   いることを確認する(達成済み)
 
 **依存**: #5(完了済み)、MVP(#1〜#9)の完了
 
@@ -692,19 +710,45 @@ Claude Projectの専用チャットスペースで行う方針に変更したこ
 - 低コスト運用必須(CLAUDE.md制約)。有料SaaS・高額API課金は避ける
 - 更新の手間(手動アップロード vs 自動公開)とデータの鮮度のバランス
 
-**タスク**
-- [ ] 上記候補(またはその他の案)を比較し、採用する公開形式を1つ決める
-      (ユーザー判断)
-- [ ] 決定した形式に沿って、report.py出力またはエクスポート処理を実装
-      する
-- [ ] 実際にClaude Projectにデータを取り込み、考察が行えることを確認
-      する
-- [ ] README.mdに運用手順(データ公開・更新の流れ)を追記する
+**採用した形式(2026-09-08)**: 候補1をベースに、当初の想定より発展した
+形で確定した。実装過程でClaude GitHub連携(Claude Help Center公式記事
+で確認)が(a)非公開リポジトリに対応しており、(b)「Configure files」
+機能で同期対象を特定フォルダに絞り込め、(c)コミット履歴・PR等の
+メタデータは同期されないと判明したため、候補2の「実装コード混入」
+という当初の懸念は解消できることが分かった。最終形:
 
-**完了条件**: 着手時に別途定義する。
+- `scripts/publish.py`で`data/latest/`配下に公開データを生成
+  (`report.md`: マトリクス表、`stats.md`: segment×monetization_model別
+  統計、`agent_docs/<owner>__<repo>.md`: CLAUDE.md/AGENTS.mdの生テキスト
+  (#22を統合、要約・解釈はしない))
+- `data/latest/`はコミット対象(`.gitignore`を`/report.md`/`/report.csv`
+  に絞り、`data/latest/report.md`等を誤って除外していた不具合も修正)
+- リポジトリは非公開のまま、Claude Project側でこのリポジトリを
+  GitHub連携し、「Configure files」で`data/latest/`のみを同期対象に
+  設定する運用とする(候補2を、非公開のまま・フォルダ限定で採用した形)
+- 候補3(別リポジトリへの分離)・候補4(SQLite配布)は不採用
+
+**タスク**
+- [x] 採用する公開形式を決定した(候補1+候補2のハイブリッド、上記参照)
+- [x] `scripts/publish.py`を実装し、report.py出力とagent doc生テキストを
+      `data/latest/`に生成する処理を作成した
+- [x] 実データ(GITHUB_TOKEN・claude CLI利用可能な環境)で実行し、
+      `data/latest/report.md`・`stats.md`・`agent_docs/`16件が正しく
+      生成されることを確認した
+- [ ] 実際にClaude Projectにこのリポジトリを接続し、「Configure files」
+      で`data/latest/`に絞り込んだ上で考察が行えることを確認する
+      (Claude Project側の操作のためユーザーが実施)
+- [x] README.mdに運用手順(`uv run scripts/publish.py`の実行方法、
+      Claude Project側のGitHub連携設定)を追記した
+
+**完了条件**:
+1. `scripts/publish.py`が実データで正しく`data/latest/`を生成する
+   (達成済み)
+2. Claude Project側で`data/latest/`のみを同期対象に接続し、実際に
+   考察が行えることを確認する(ユーザー側での確認待ち)
 
 **依存**: #8(完了済み)、#17(完了済み。考察時の解釈上の注意点として
-Claude Project側で参照)
+Claude Project側で参照)、#22(本Issueに統合)
 
 ---
 
@@ -757,7 +801,7 @@ instructions/tests/CI等の基礎的な運用整備に留まる。ユーザー�
 
 ---
 
-## #22 #19の公開データにCLAUDE.md/AGENTS.mdの本文を含める(#15議論中に発見)
+## #22 #19の公開データにCLAUDE.md/AGENTS.mdの本文を含める(#19に統合済み)
 
 **概要**: #19(データをClaude Projectから参照しやすい公開形式の検討)
 で公開するデータが、真偽値・数値に変換した派生指標のみだと、Claude
@@ -767,17 +811,14 @@ Project側での定性的な考察の材料が乏しい。ユーザーとの議�
 本文を要約・解釈することはせず(#12中止の理由と同じ)、生のテキストを
 渡すことで要約・解釈自体はClaude Project側に委ねる。
 
-**タスク**(たたき台、着手時に確定する)
-- [ ] #19の公開形式の検討に統合するか、独立したタスクにするかを決める
-- [ ] 本文をそのまま含めるか、一定の長さで抜粋するかを検討する
-      (`agent_doc_char_count`の分布(最大120,034字)を踏まえた現実的な
-      サイズ判断が必要)
-- [ ] ライセンス・著作権上の扱い(他者のリポジトリの文章をそのまま
-      転載してよいか)を確認する
+**対応内容(2026-09-08)**: 独立したタスクにはせず、#19の実装に統合した。
+`scripts/publish.py`が各リポジトリのCLAUDE.md/AGENTS.mdの生テキストを
+`data/latest/agent_docs/<owner>__<repo>.md`として出力する
+(抜粋・要約はせず全文をそのまま出力。出典(owner/repo)をファイル名と
+見出しに明記した抜粋転載として扱う)。実データで16リポジトリ分
+(最大約120KB/件)の生成を確認済み。詳細はIssue #19参照。
 
-**完了条件**: 着手時に別途定義する。
-
-**依存**: #19(未着手)、#5(完了済み)
+**依存**: #19(完了、詳細は#19セクション参照)、#5(完了済み)
 
 ---
 

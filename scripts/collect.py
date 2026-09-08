@@ -1,3 +1,4 @@
+import sys
 from datetime import datetime, timezone
 
 from agent_trend_radar import agent_doc_analysis, checks, config, llm_content_analysis, storage
@@ -31,6 +32,7 @@ def run_checks_for_repo(client: GitHubClient, repo: str) -> dict:
 
 
 def main() -> None:
+    sys.stdout.reconfigure(encoding="utf-8")
     targets = config.load_targets()
     client = GitHubClient()
     conn = storage.connect()
