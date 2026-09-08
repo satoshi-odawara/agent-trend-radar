@@ -735,6 +735,10 @@ Claude Projectの専用チャットスペースで行う方針に変更したこ
 - [x] 実データ(GITHUB_TOKEN・claude CLI利用可能な環境)で実行し、
       `data/latest/report.md`・`stats.md`・`agent_docs/`16件が正しく
       生成されることを確認した
+- [x] `data/latest/ANALYSIS_INSTRUCTIONS.md`を追加し、Claude Project側で
+      データの有効性・妥当性を検証してもらうための指示書とした
+      (`reports/analysis_interpretation_caveats.md`(#17)の注意点を
+      要約転記。`publish.py`はこのファイルを上書きしない静的ファイル)
 - [ ] 実際にClaude Projectにこのリポジトリを接続し、「Configure files」
       で`data/latest/`に絞り込んだ上で考察が行えることを確認する
       (Claude Project側の操作のためユーザーが実施)

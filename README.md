@@ -60,6 +60,10 @@ uv run scripts/publish.py
 - `data/latest/agent_docs/<owner>__<repo>.md`: 各リポジトリのCLAUDE.md/
   AGENTS.mdの生テキスト(要約・解釈はせず原文のまま。出典明記の抜粋転載
   として扱う)
+- `data/latest/ANALYSIS_INSTRUCTIONS.md`: Claude Project側でこのデータ
+  の有効性・妥当性を検証してもらうための指示書(手書きの静的ファイルで
+  `publish.py`の再実行では上書きされない)。Claude Projectのカスタム
+  指示または最初のメッセージとして使う想定
 
 `data/latest/`はコミット対象(`.gitignore`対象外)。リポジトリは非公開の
 ままでよい。Claude Project側でこのリポジトリをGitHub連携し、
