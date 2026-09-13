@@ -70,3 +70,53 @@ uv run scripts/publish.py
 「Configure files」機能で同期対象を`data/latest/`だけに絞り込むことで、
 `src/`/`tests/`等の実装コードをProjectに混入させずにデータだけを参照
 できる(コミット履歴・PR等のメタデータは連携でも同期されない)。
+
+## agent-trend-dataへの連携(Issue #24)
+
+記事作成システムがデータを参照できるよう、収集結果を別リポジトリ
+`agent-trend-data`(ハブ)へ反映する。Fine-grained PATの発行に時間が
+かかるため、当面はローカル実行のPowerShellスクリプトで連携し、
+GitHub Actions経由の自動化はPAT発行後に切り替える(下記参照)。
+
+### 現在の運用: ローカルスクリプトによる連携
+
+`agent-trend-data`が`agent-trend-radar`と同階層の兄弟ディレクトリ
+(`..\agent-trend-data`)にcloneされていることが前提。
+
+```
+.\sync_to_hub.ps1
+```
+
+このスクリプトが以下を一気通貫で行う:
+
+1. `scripts/collect.py`で収集
+2. `scripts/export_hub_snapshot.py`で収集結果をJSONスナップショットに変換
+   (`agent-trend-data/schema/SCHEMA.md`は2026-09-13時点でTBDのため、
+   スキーマ確定までの暫定措置として現状の収集結果フォーマットをそのまま
+   採用している)
+3. `..\agent-trend-data\snapshots\<実行日>\metrics.json`と
+   `latest\metrics.json`を更新、`scripts/update_hub_manifest.py`で
+   `manifest.json`に実行日を追記(重複追加なし)
+4. 変更があれば`agent-trend-data`側でコミット・push
+   (`data: <実行日> snapshot`)
+
+収集(`collect.py`)が失敗した場合、スクリプトはそこで停止し、後続の
+ハブへのコピー・push は行われない。ハブへのpushがコンフリクト等で
+失敗した場合はエラーで停止する(自動リトライはしない)。
+
+### 将来の運用: GitHub Actionsによる自動化(未使用、PAT発行後に有効化)
+
+`.github/workflows/collect-and-publish.yml`に、週次(毎週月曜
+00:00 UTC)/手動実行(`workflow_dispatch`)でCI上から直接
+`agent-trend-data`へpushする定義を用意済みだが、Fine-grained PAT
+未発行のため現時点では実行しても失敗する(Secrets未設定)。有効化する
+場合、以下のリポジトリSecretsが必要:
+
+- `CLAUDE_CODE_OAUTH_TOKEN`: `claude setup-token`で発行するサブスク
+  リプション認証トークン(`scripts/collect.py`内のLLMテーマ分類が
+  `claude` CLIを使うため。追加のAPI課金は発生しない)
+- `HUB_REPO_PAT`: `agent-trend-data`リポジトリのみに限定した
+  Fine-grained PAT(権限は`Contents: Read and write`のみ)。デフォルトの
+  `GITHUB_TOKEN`は実行元リポジトリにしかアクセス権を持たず、別リポジトリ
+  への書き込みができないため必要(`agent-trend-data`のCLAUDE.mdもこの
+  前提で設計されている)

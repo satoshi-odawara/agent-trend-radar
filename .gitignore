@@ -5,4 +5,5 @@ __pycache__/
 *.db
 /report.md
 /report.csv
+/hub_export/
 .pytest_cache/

@@ -313,7 +313,8 @@ Issueは「実装型」「調査・検討型」いずれかのテンプレート
 
 参考・着手はMVP振り返り後に判断。詳細は各Issueの個別セクションを参照。
 
-- [ ] #10 GitHub Actions週次cron化
+- [x] #10 GitHub Actions週次cron化 — 2026-09-13 #24の中で実装完了
+      (詳細は末尾セクション参照)
 - [ ] #11 レート制限・エラーハンドリングの強化
 - [x] #12 LLMによる要約・記事生成 — 2026-09-08 方針転換により中止
 - [ ] #13 対象リポジトリ追加・入れ替えのフロー整備
@@ -337,6 +338,10 @@ Issueは「実装型」「調査・検討型」いずれかのテンプレート
       2026-09-08 #19に統合して実装完了(詳細は末尾セクション参照)
 - [ ] #23 PR品質・レビュー通過率・インシデント率等のアウトカム指標の
       収集検討(#15議論中に発見、未解決の方法論的課題あり)
+- [x] #24 agent-trend-dataへの連携機能を実装する — 2026-09-13
+      PAT発行に時間がかかるためローカルスクリプト(`sync_to_hub.ps1`)
+      連携に方針転換、実装・実行確認完了(CI版はPAT発行後に別途確認、
+      詳細は末尾セクション参照)
 
 ---
 
@@ -364,6 +369,11 @@ LLM分類にClaude Code CLIのヘッドレス実行(`claude -p`)を採用した�
 **完了条件**: 着手時に別途定義する。
 
 **依存**: #7(完了済み)、#15(完了済み)
+
+**対応内容(2026-09-13)**: #24(agent-trend-dataへの連携機能実装)の
+中で、ハブへのpush検証に必要な前提として本Issueのワークフロー本体を
+実装した。認証方式はサブスクリプション認証(`CLAUDE_CODE_OAUTH_TOKEN`)
+を採用。詳細は#24を参照。
 
 ---
 
@@ -864,3 +874,91 @@ Project側での定性的な考察の材料が乏しい。ユーザーとの議�
 **完了条件**: 着手時に別途定義する。
 
 **依存**: #9(完了済み)
+
+---
+
+## #24 agent-trend-dataへの連携機能を実装する
+
+**概要**: データ収集システム(agent-trend-radar)と記事作成システムは
+意図的にコンテキストを分離しており、記事作成システムが収集結果を
+参照できるよう、ハブリポジトリ`agent-trend-data`へ収集結果を自動反映
+する仕組みを実装する。
+
+**変更対象ファイル**
+- `.github/workflows/collect-and-publish.yml`(新規、現時点では未使用。
+  下記「方針転換」参照)
+- `scripts/export_hub_snapshot.py`(新規)
+- `scripts/update_hub_manifest.py`(新規)
+- `tests/test_export_hub_snapshot.py`(新規)
+- `tests/test_update_hub_manifest.py`(新規)
+- `sync_to_hub.ps1`(新規、方針転換により追加)
+- `.gitignore`(`/hub_export/`追加)
+- `README.md`(運用手順・必要Secrets追記)
+
+**着手前に判明した前提のずれ**: 本Issueのタスクは「既存の収集ワーク
+フローの末尾にpushステップを追加する」ことを想定していたが、
+着手時点で本リポジトリにGitHub Actionsワークフローが1つも存在せず
+(#10が未着手のまま)、この前提が成立しなかった。ユーザーに確認の上、
+本Issueの中で新規ワークフローを作成する形で対応した(#10も実質的に
+解決)。
+
+**方針転換(2026-09-13)**: Fine-grained PATの発行に時間がかかるとの
+判断から、GitHub Actions経由のCI自動化(PAT前提)を一旦保留し、
+ローカル実行のPowerShellスクリプト(`sync_to_hub.ps1`)による連携に
+切り替えた。`agent-trend-data`が`agent-trend-radar`と同階層の兄弟
+ディレクトリにcloneされている前提で、collect.py実行からハブへの
+commit・pushまでを1スクリプトで完結させる(ユーザー判断により
+commit・pushまで完全自動化)。`.github/workflows/collect-and-publish.yml`
+は削除せず、PAT発行後に有効化する想定でそのまま残した(現状は
+Secrets未設定のため実行しても失敗する)。
+
+**タスク**
+- [x] デフォルト`GITHUB_TOKEN`での書き込みテストは実施せず、PATを直接
+      採用した。理由: デフォルト`GITHUB_TOKEN`が実行元リポジトリにしか
+      アクセス権を持たないことはGitHub Actionsの既知の制約であり、
+      `agent-trend-data`のCLAUDE.md自体が「専用のFine-grained PATを
+      使ってpushしてくる」ことを設計前提として明記していたため、実際に
+      失敗するテストワークフローを1回分実行する価値がないと判断した
+- [x] Fine-grained PAT(`agent-trend-data`のみ、`Contents: Read and
+      write`のみ)を発行し、`HUB_REPO_PAT`としてリポジトリSecretsに
+      登録する運用とした(発行・登録はユーザー側の手動作業。README.md
+      に手順を明記)
+- [x] `.github/workflows/collect-and-publish.yml`を新規作成(手動実行
+      `workflow_dispatch`+週次cron)。`collect.py`実行→
+      `export_hub_snapshot.py`でJSONスナップショット生成→
+      `agent-trend-data`をcheckout→`snapshots/<実行日>/metrics.json`・
+      `latest/metrics.json`更新→`update_hub_manifest.py`で
+      `manifest.json`に実行日追記→コミット・push
+      (`data: <実行日> snapshot`)
+- [x] `claude` CLIのCI認証は`CLAUDE_CODE_OAUTH_TOKEN`(サブスクリプション
+      認証)を採用し、CLAUDE.mdの低コスト運用方針に合わせた
+      (#10の未解決論点をあわせて解消)
+- [x] `agent-trend-data/schema/SCHEMA.md`はTBD(未確定)のため、
+      現状の収集結果フォーマット(`report.py`の`ALL_COLUMNS`)を
+      そのまま暫定採用し、ワークフロー内にコメントで明記した
+- [x] `manifest.json`の日付重複追加を防ぐロジック(`update_hub_manifest
+      .add_date`、setで重複排除)を実装・テストした
+- [x] 収集失敗時はジョブが途中で失敗し、後続のハブへのpushが行われない
+      (GitHub Actionsのステップ失敗時のデフォルト挙動)ことを確認した
+- [x] 方針転換に伴い`sync_to_hub.ps1`を新規作成。collect.py実行→
+      `export_hub_snapshot.py`でJSON生成→`..\agent-trend-data`配下の
+      `snapshots\<実行日>\metrics.json`・`latest\metrics.json`を更新→
+      `update_hub_manifest.py`で`manifest.json`更新→`agent-trend-data`
+      側でcommit・pushまでを1スクリプトで実行する
+- [x] `sync_to_hub.ps1`を実際に実行し、`agent-trend-data`に当日分の
+      `snapshots/`・`latest/`・`manifest.json`が正しく反映され、
+      pushされることを確認した(2026-09-13、20リポジトリ全件収集
+      成功、コミット`5a805a2`「data: 2026-09-13 snapshot」でpush済み。
+      GitHub側の`manifest.json`・`snapshots/2026-09-13/`の実在も確認)
+- [ ] (将来)Fine-grained PAT発行後、`workflow_dispatch`でCI版
+      ワークフローも実行確認する
+
+**完了条件**:
+1. `sync_to_hub.ps1`実行後、`agent-trend-data`に当日分のスナップショット
+   と`latest/`が反映され、pushされる(達成済み、2026-09-13確認)
+2. `manifest.json`が正しく更新される(達成済み、同上)
+3. 収集が失敗した場合、ハブ側に不完全なデータが書き込まれない(達成済み、
+   `sync_to_hub.ps1`はcollect.py失敗時に後続処理を実行しない設計、
+   GitHub Actions版もステップ失敗時のデフォルト挙動により保証)
+
+**依存**: #7(完了済み)、#15(完了済み)、#19(完了済み)
