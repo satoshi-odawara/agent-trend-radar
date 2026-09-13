@@ -28,6 +28,12 @@ def run_checks_for_repo(client: GitHubClient, repo: str) -> dict:
         "agent_doc_mentions_boundaries": llm_themes["agent_doc_mentions_boundaries"],
         "agent_doc_mentions_pr_review": llm_themes["agent_doc_mentions_pr_review"],
         "agent_doc_mentions_release_process": llm_themes["agent_doc_mentions_release_process"],
+        "has_skills_dir": checks.has_skills_dir(client, repo),
+        "skills_count": checks.skills_count(client, repo),
+        "has_custom_commands": checks.has_custom_commands(client, repo),
+        "custom_commands_count": checks.custom_commands_count(client, repo),
+        "has_hooks_config": checks.has_hooks_config(client, repo),
+        "mcp_servers_count": checks.mcp_servers_count(client, repo),
     }
 
 

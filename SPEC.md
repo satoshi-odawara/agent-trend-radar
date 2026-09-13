@@ -70,8 +70,17 @@ owner/repoのGitHub API実データ(スター数・作成日)、および各社�
 | has_eval | evals/ / eval/ | エージェントの評価を行っているか |
 | has_ci | .github/workflows/ | CI/CDを回しているか |
 | has_security_policy | SECURITY.md | セキュリティ方針を明示しているか |
+| has_skills_dir | .claude/skills/ | 再利用可能なSkillを定義しているか |
+| skills_count | .claude/skills/直下の子要素数 | Skill定義の充実度 |
+| has_custom_commands | .claude/commands/ | カスタムslash commandsを定義しているか |
+| custom_commands_count | .claude/commands/配下の.mdファイル数 | カスタムcommand定義の充実度 |
+| has_hooks_config | .claude/settings.jsonの`hooks`キー | エージェントの挙動を機械的に制約する仕組みがあるか |
+| mcp_servers_count | .mcp.jsonの`mcpServers`の数 | 連携しているMCPサーバー数 |
 
 ※ 項目は運用しながら追加・削除してよい。
+※ `has_skills_dir`〜`mcp_servers_count`の6項目は、「ルール化(CLAUDE.md等)
+と対になるツール化の実態」を測るためIssue #21で追加(agent-trend-data
+data-requests/pending由来の要望を具体化、2026-09-13)。
 
 ### 既知の制限
 
@@ -85,6 +94,21 @@ CLAUDE.mdのシンプルさ優先方針に基づく意図的な割り切りと�
 の問題が過去にあったが、Git Trees API(`recursive=1`)による全深度探索に
 2026-09-07実装のIssue #14で対応済み(20リポジトリ中19件がtrueに改善、
 falseはyoheinakajima/babyagiのみで実態と一致)。
+
+`has_hooks_config`/`mcp_servers_count`は、ファイル存在だけでなく
+`.claude/settings.json`/`.mcp.json`の中身(JSONキー)まで見て判定する。
+「ファイル存在確認」中心のMVPスコープ方針からはわずかに踏み出すが、
+CLAUDE.md/AGENTS.mdの内容分析(構造ベース)で既に認めている「決定的な
+構造分析」の延長として扱う(Issue #21)。`.claude/skills/`/
+`.claude/commands/`以外の慣習(サブエージェント`.claude/agents/`、
+Cursorの`.cursor/rules/`等)は今回のスコープに含めていない(将来の拡張
+候補)。
+
+`skills_count`は`.claude/skills/<name>/SKILL.md`というサブディレクトリ
+形式だけでなく、実体を別の場所に置いてシンボリックリンクで
+`.claude/skills/<name>`として公開する形式(実データでcline/cline確認済み)
+もあるため、ファイル種別を問わず`.claude/skills/`直下の子要素数を数える
+方式にしている(SKILL.mdファイル名一致では検知漏れが生じるため)。
 
 ### 廃止した項目とその理由
 
@@ -156,6 +180,7 @@ Anthropic APIの従量課金ではなく、Claude Code CLIのヘッドレス実�
 | checked_at | チェック実行日 |
 | (ファイル存在系チェック項目キー) | 真偽値(存在する=true) |
 | (CLAUDE.md/AGENTS.md内容分析キー) | 数値(char_count/heading_count) または真偽値 |
+| (エージェント運用ツール項目キー) | 真偽値(has_*)または数値(*_count) |
 
 ## 保存形式
 - SQLite、テーブル名: `repo_checks`

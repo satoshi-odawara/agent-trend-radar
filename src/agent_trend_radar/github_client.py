@@ -19,6 +19,7 @@ class GitHubClient:
     ) -> None:
         self._token = token if token is not None else os.environ.get("GITHUB_TOKEN")
         self._session = session or requests.Session()
+        self._tree_cache: dict[str, list[dict]] = {}
 
     def path_exists(self, repo: str, path: str) -> bool:
         response = self._get_contents(repo, path)
@@ -48,23 +49,57 @@ class GitHubClient:
     def get_directory_names(self, repo: str) -> set[str]:
         """リポジトリ全体(任意の深さ)に存在するディレクトリ名(basename)の集合を返す。
 
-        Git Trees APIのrecursive=1を使い1リクエストで全深度を取得する。
         モノレポ構成でルート直下に対象ディレクトリがないケースを検知するため
         (#14参照)。
         """
-        owner, name = repo.split("/", 1)
-        url = f"{GITHUB_API_BASE}/repos/{owner}/{name}/git/trees/HEAD?recursive=1"
-        response = self._request(url)
-        if response.status_code != 200:
-            raise GitHubClientError(
-                f"GitHub APIエラー: {repo}のツリー取得 -> {response.status_code}"
-            )
-        data = response.json()
         return {
             entry["path"].rsplit("/", 1)[-1]
-            for entry in data.get("tree", [])
+            for entry in self._get_tree_entries(repo)
             if entry.get("type") == "tree"
         }
+
+    def get_file_paths(self, repo: str) -> set[str]:
+        """リポジトリ全体(任意の深さ)に存在するファイルパス(リポジトリルートからの相対パス)の集合を返す。"""
+        return {
+            entry["path"]
+            for entry in self._get_tree_entries(repo)
+            if entry.get("type") == "blob"
+        }
+
+    def list_immediate_children(self, repo: str, dir_path: str) -> set[str]:
+        """dir_path直下の子要素のbasename集合を返す(ディレクトリ・ファイル・
+        シンボリックリンクいずれも対象)。
+
+        Skillの実体が`.claude/skills/<name>/SKILL.md`ではなく、共有先への
+        シンボリックリンク`.claude/skills/<name>`として置かれているケース
+        (cline/cline等)があるため、ファイル種別を問わず直下の子要素数を
+        数える(#21)。
+        """
+        prefix = f"{dir_path}/"
+        children = set()
+        for entry in self._get_tree_entries(repo):
+            path = entry["path"]
+            if path.startswith(prefix):
+                children.add(path[len(prefix):].split("/", 1)[0])
+        return children
+
+    def _get_tree_entries(self, repo: str) -> list[dict]:
+        """Git Trees APIのrecursive=1を1リクエストで取得し、リポジトリ単位でキャッシュする。
+
+        get_directory_names/get_file_pathsが同一repoに対して個別にAPIを
+        叩くと収集全体のAPI呼び出し数が増えるため(#21で新設)、キャッシュ
+        して1リポジトリ1回に抑える。
+        """
+        if repo not in self._tree_cache:
+            owner, name = repo.split("/", 1)
+            url = f"{GITHUB_API_BASE}/repos/{owner}/{name}/git/trees/HEAD?recursive=1"
+            response = self._request(url)
+            if response.status_code != 200:
+                raise GitHubClientError(
+                    f"GitHub APIエラー: {repo}のツリー取得 -> {response.status_code}"
+                )
+            self._tree_cache[repo] = response.json().get("tree", [])
+        return self._tree_cache[repo]
 
     def _get_contents(self, repo: str, path: str) -> requests.Response:
         owner, name = repo.split("/", 1)

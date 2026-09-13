@@ -22,10 +22,15 @@ class FakeSession:
     def __init__(self, responses):
         self._responses = responses
         self.last_headers = None
+        self._call_counts: dict[str, int] = {}
 
     def get(self, url, headers=None):
         self.last_headers = headers
+        self._call_counts[url] = self._call_counts.get(url, 0) + 1
         return self._responses[url]
+
+    def call_count(self, url):
+        return self._call_counts.get(url, 0)
 
 
 def test_path_exists_true_for_existing_path():
@@ -101,6 +106,55 @@ def test_get_directory_names_raises_on_unexpected_status():
 
     with pytest.raises(GitHubClientError):
         client.get_directory_names("owner/repo")
+
+
+def test_get_file_paths_returns_blob_paths_only():
+    tree = {
+        "tree": [
+            {"path": ".claude", "type": "tree"},
+            {"path": ".claude/skills", "type": "tree"},
+            {"path": ".claude/skills/foo/SKILL.md", "type": "blob"},
+        ]
+    }
+    session = FakeSession({TREE_URL: FakeResponse(200, json_data=tree)})
+    client = GitHubClient(token="dummy", session=session)
+
+    assert client.get_file_paths("owner/repo") == {".claude/skills/foo/SKILL.md"}
+
+
+def test_list_immediate_children_includes_symlinks_and_dirs():
+    tree = {
+        "tree": [
+            {"path": ".claude/skills", "type": "tree"},
+            {"path": ".claude/skills/foo", "type": "tree"},
+            {"path": ".claude/skills/foo/SKILL.md", "type": "blob"},
+            {"path": ".claude/skills/bar", "type": "blob"},  # symlink(mode 120000)
+        ]
+    }
+    session = FakeSession({TREE_URL: FakeResponse(200, json_data=tree)})
+    client = GitHubClient(token="dummy", session=session)
+
+    assert client.list_immediate_children("owner/repo", ".claude/skills") == {"foo", "bar"}
+
+
+def test_list_immediate_children_empty_when_dir_missing():
+    session = FakeSession({TREE_URL: FakeResponse(200, json_data={"tree": []})})
+    client = GitHubClient(token="dummy", session=session)
+
+    assert client.list_immediate_children("owner/repo", ".claude/skills") == set()
+
+
+def test_tree_entries_are_cached_per_repo():
+    """get_directory_names/get_file_pathsを同じrepoに対して呼んでも、
+    Git Trees APIへのリクエストは1回に抑えられる(#21、API呼び出し数の抑制)。"""
+    tree = {"tree": [{"path": "tests", "type": "tree"}]}
+    session = FakeSession({TREE_URL: FakeResponse(200, json_data=tree)})
+    client = GitHubClient(token="dummy", session=session)
+
+    client.get_directory_names("owner/repo")
+    client.get_file_paths("owner/repo")
+
+    assert session.call_count(TREE_URL) == 1
 
 
 def test_uses_token_from_env_var(monkeypatch):

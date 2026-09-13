@@ -22,6 +22,12 @@ SAMPLE_CHECKS = {
     "agent_doc_mentions_boundaries": False,
     "agent_doc_mentions_pr_review": False,
     "agent_doc_mentions_release_process": False,
+    "has_skills_dir": True,
+    "skills_count": 2,
+    "has_custom_commands": True,
+    "custom_commands_count": 3,
+    "has_hooks_config": False,
+    "mcp_servers_count": 0,
 }
 
 

@@ -332,8 +332,9 @@ Issueは「実装型」「調査・検討型」いずれかのテンプレート
       (#12中止に伴い新設、詳細は末尾セクション参照)
 - [ ] #20 has_ci / agent_doc_has_code_blockの天井・床効果の見直し
       (MVP品質評価で発見、詳細は末尾セクション参照)
-- [ ] #21 高度なエージェント運用ツール導入の有無チェック項目の追加
-      (#15議論中に発見)
+- [x] #21 高度なエージェント運用ツール導入の有無チェック項目の追加
+      (#15議論中に発見) — 2026-09-13 実装・実データでの反映確認完了
+      (詳細は末尾セクション参照)
 - [x] #22 #19の公開データにCLAUDE.md/AGENTS.mdの本文を含める —
       2026-09-08 #19に統合して実装完了(詳細は末尾セクション参照)
 - [ ] #23 PR品質・レビュー通過率・インシデント率等のアウトカム指標の
@@ -801,17 +802,63 @@ instructions/tests/CI等の基礎的な運用整備に留まる。ユーザー�
 度合いを示すシグナルを追加する案が挙がった。既存の「ファイル/
 ディレクトリ存在確認」という決定的な方法論のまま拡張できる。
 
-**タスク**(たたき台、着手時に確定する)
-- [ ] 候補パスを確定する(例: `.claude/commands/`, `.claude/skills/`,
-      `.claude/agents/`, `.mcp.json`, `.cursor/rules/`等。エージェント
-      ツールによってパスの慣習が異なる点に注意)
-- [ ] Git Trees API(#14で導入済みの`get_directory_names`)を使うか、
-      個別パスのContents API確認で足りるかを判断する
-- [ ] SPEC.mdのチェック項目表に追記する
+**変更対象ファイル**
+- `src/agent_trend_radar/github_client.py`(`get_file_paths`・Tree API
+  レスポンスのキャッシュを追加)
+- `src/agent_trend_radar/checks.py`(6項目のチェック関数を追加)
+- `src/agent_trend_radar/storage.py`(`CHECK_COLUMNS`に6項目追加)
+- `scripts/collect.py`(新チェックの呼び出しを追加)
+- `scripts/report.py`(`NUMERIC_COLUMNS`に3項目追加)
+- `SPEC.md`(チェック項目表・既知の制限に追記)
+- `tests/test_github_client.py`・`tests/test_checks.py`・
+  `tests/test_storage.py`・`tests/test_export_hub_snapshot.py`
 
-**完了条件**: 着手時に別途定義する。
+**具体化の経緯(2026-09-13)**: `agent-trend-data/data-requests/pending/
+2026-09-13-agent-tooling-metrics.md`として、記事作成システム側
+(`agent-trend-playbook`)から「ルール化とツール化の境界線」というテーマ
+検証のため、具体的なフィールド名を伴う要望が届いた。ユーザー確認の上、
+本Issueのたたき台をこの要望で具体化し、そのまま着手した。
 
-**依存**: #4(完了済み)、#14(完了済み)
+**確定した6項目**(候補にあった`.claude/agents/`・`.cursor/rules/`は
+今回のスコープ外、SPEC.md「既知の制限」に将来の拡張候補として記載):
+- `has_skills_dir` / `skills_count`: `.claude/skills/*/SKILL.md`の有無・数
+- `has_custom_commands` / `custom_commands_count`:
+  `.claude/commands/`配下の`.md`ファイルの有無・数(サブディレクトリ含む)
+- `has_hooks_config`: `.claude/settings.json`の`hooks`キーが空でないか
+- `mcp_servers_count`: `.mcp.json`の`mcpServers`の数
+
+**タスク**
+- [x] 候補パスを確定した(上記4フィールド6項目、`.claude/agents/`・
+      `.cursor/rules/`は対象外)
+- [x] Git Trees APIを使う方針とした。既存`get_directory_names`に加えて
+      `get_file_paths`(blobパス一覧)を追加し、両者が同一repoに対して
+      重複してAPIを叩かないよう`GitHubClient`内でTreeレスポンスを
+      リポジトリ単位にキャッシュした(API呼び出し数を増やさない対応)
+- [x] `has_hooks_config`/`mcp_servers_count`はファイル存在だけでは
+      判定できないため、JSON内容を読んでキー有無・件数を見る方式とした
+      (CLAUDE.md/AGENTS.md内容分析で既に認めている「決定的な構造分析」の
+      延長として整理、SPEC.md参照)
+- [x] SPEC.mdのチェック項目表・既知の制限に追記した
+- [x] 各関数のユニットテストを追加し、全76件パス確認済み
+- [x] 実データ(`cline/cline`, `astral-sh/ruff`, `langchain-ai/langchain`)
+      で動作確認する過程で、`skills_count`の初期実装(`SKILL.md`
+      ファイル名一致)がバグを含むことを発見・修正した。cline/cline は
+      Skill実体を別の場所に置き`.claude/skills/<name>`をシンボリック
+      リンクとして公開する形式(mode 120000)を使っており、SKILL.md
+      ファイル名一致では0件になっていた(実際は6件)。`GitHubClient`に
+      `list_immediate_children`を追加し、ファイル種別を問わず
+      `.claude/skills/`直下の子要素数を数える方式に修正。テスト追加の上
+      全79件パス確認済み
+
+**完了条件**: 対象20リポジトリ分の収集で新規6項目が正しく収集され、
+`agent-trend-data`のmetrics.jsonに反映される(達成済み、2026-09-13
+`sync_to_hub.ps1`実行・コミット`720b4ad`で確認。cline/cline:
+skills_count=6/custom_commands_count=2/has_hooks_config=1、
+astral-sh/ruff: has_hooks_config=1、langchain-ai/langchain:
+mcp_servers_count=2など、事前の個別確認と一致)。
+
+**依存**: #4(完了済み)、#14(完了済み)、#24(完了済み、収集結果は
+`sync_to_hub.ps1`経由でagent-trend-dataへ連携)
 
 ---
 

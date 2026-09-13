@@ -5,7 +5,13 @@ import sys
 
 from agent_trend_radar import storage
 
-NUMERIC_COLUMNS = {"agent_doc_char_count", "agent_doc_heading_count"}
+NUMERIC_COLUMNS = {
+    "agent_doc_char_count",
+    "agent_doc_heading_count",
+    "skills_count",
+    "custom_commands_count",
+    "mcp_servers_count",
+}
 
 META_COLUMNS = ["repo", "segment", "monetization_model"]
 ALL_COLUMNS = META_COLUMNS + storage.CHECK_COLUMNS
