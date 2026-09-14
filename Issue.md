@@ -350,6 +350,13 @@ Issueは「実装型」「調査・検討型」いずれかのテンプレート
 - [x] #26 agent-trend-data SCHEMA.mdの反映漏れを再発防止する仕組みの構築
       — 2026-09-14 実装完了(#25の#1で発生した事象を受けて起票、詳細は
       末尾セクション参照)
+- [x] #27 分析担当(playbook)からのデータ収集issue案3件への対応(2回目)
+      — 2026-09-14 完了。#1は案Cで確定・注意書き追記、#2→#28、
+      #3→#29へ切り出し(詳細は末尾セクション参照)
+- [ ] #28 skills検出ロジックを.agents/skills対応に拡張する(#27の#2から
+      分離、詳細は末尾セクション参照)
+- [ ] #29 モノレポでの指示文書網羅性とモノレポ傾向の指標化(#27の#3から
+      分離、設計方針は未確定、詳細は末尾セクション参照)
 
 ---
 
@@ -1134,4 +1141,188 @@ CLAUDE.md自身の運用ルール(「フィールドを追加・変更する際�
 検知して中断する(達成済み、上記の意図的な不一致テストで確認)。
 
 **依存**: #21(完了済み)、#24(完了済み)、#25(完了済み、本Issueの
+発端)
+
+---
+
+## #27 分析担当(playbook)からのデータ収集issue案3件への対応(2回目)
+
+**概要**: 記事作成システム側(`agent-trend-playbook`)から、収集データの
+品質・指標設計に関する3件のissue案が届いた(2026-09-14、ユーザー経由)。
+根拠ログ(`agent-trend-playbook/verifications/2026-09-14-rule-vs-tool-boundary/log.md`)
+と実データで裏取りした上で対応方針を協議した。
+
+**受領した3件と対応**:
+
+1. **指示文書の"統制の強さ"を測る指標を検討する**: nuxt/nuxt(948字、
+   AI自律コントリビューション禁止)がAutoGPT(3,822字、通常のコード
+   スタイル規約)より明らかに強い統制なのに既存指標では差が見えない、
+   という事実は確認した。提案の3案(A: キーワード一致、B: LLM分類、
+   C: 新指標を追加せず記事作成側の手動読解に委ねる)のうち、以下の理由で
+   **案C(新指標は追加しない)を推奨**する:
+   - 案Aは「統制の強さ」という多段階・文脈依存の概念をキーワード一致
+     だけでは捉えられず、既存の`agent_doc_mentions_boundaries`と実質
+     同じ精度の二値フラグにしかならない
+   - 案Bは#25で判明したばかりのLLM分類の非決定性(#25の#2b、未解決)を
+     抱えたまま、さらにLLM依存フィールドを増やすことになる
+   - 検証ログ自体が「データだけでは分からず実際に読まないと分からない
+     ことがあると実感した」と結論しており、これはCLAUDE.mdの「収集は
+     決定的に行い、解釈は記事作成側に委ねる」という設計方針と整合する
+   - 代替として、既存の量的指標(`agent_doc_char_count`等)を統制の強さ
+     の代理指標として使わないよう、SCHEMA.mdまたは
+     `ANALYSIS_INSTRUCTIONS.md`に注意書きを追記することを提案する
+   **対応内容(2026-09-14)**: 案Cで進めることをユーザーに確認済み。
+   `agent-trend-data/schema/SCHEMA.md`(コミット`954c556`)と
+   `agent-trend-radar/data/latest/ANALYSIS_INSTRUCTIONS.md`の両方に
+   「文書量を統制の強さの代理指標にしない」注意書きを追記した。
+
+2. **OpenHandsのskills検出漏れの原因を調査する**: 原因を特定した。
+   OpenHandsは`.claude/skills`が存在せず`.agents/skills/`を直接使用
+   しており、現行ロジックは`.claude/skills`起点でしか探索しないため
+   検知できなかった。さらに調査したところ、OpenHands固有の問題では
+   なく、`.agents/skills/`はAgentSkills.io等が推進する実在のクロスツール
+   標準(Codex/Gemini CLI/Cursor/VS Code Copilot/Zed等が対応、Web検索で
+   裏取り済み)であり、20リポジトリ中6件で`.claude/skills`とのカウント
+   不一致(remix-run/remix: 0→19等)を確認した。修正範囲がOpenHands限定
+   という当初想定より大きいため、**修正自体は新規Issue #28として
+   切り出した**。
+
+3. **指示文書の適用範囲(スコープ)を測る指標を検討する**: AutoGPTの
+   AGENTS.mdが`autogpt_platform/`限定という主張は、実際に文書を読んで
+   確認した(「This guide provides context for coding agents when
+   updating the autogpt_platform folder」と明記)。ただし調査の過程で、
+   AutoGPTはリポジトリ全体で21個のAGENTS.md/CLAUDE.mdを持つモノレポ
+   構成であるにもかかわらず、現行の収集ロジック(`has_agent_instructions`
+   /`agent_doc_*`)がルート直下のファイルしか見ていないという、より
+   根本的な問題を発見した(`has_tests`が#14で対応済みの「モノレポでの
+   検知漏れ」と同型のバグ)。20リポジトリ中10件でルート外に指示文書が
+   あり、`continuedev/continue`は`has_agent_instructions`の真偽値自体が
+   誤っていた(実際はtrueなのにfalse)。この問題を先に解決する必要が
+   あるため、**提案#3は保留し、新規Issue #29(モノレポでの指示文書
+   網羅性)として切り出した**。ユーザーから「モノレポ構成である傾向
+   自体も指標として捉えたい」という追加要望があり、#29のスコープに
+   含めた。
+
+**タスク**
+- [x] #1(統制の強さ)の対応方針(案C採用)についてユーザーの最終確認を
+      得て、SCHEMA.md・ANALYSIS_INSTRUCTIONS.mdに注意書きを追記した
+- [x] #2(OpenHandsのskills検出漏れ)の原因調査完了、修正はIssue #28へ
+- [x] #3(指示文書のスコープ)の調査完了、より根本的な問題(モノレポ
+      網羅性)を発見しIssue #29へ
+
+**完了条件**: 3件とも対応方針が確定している(達成済み。#1は注意書き
+追記で対応完了、#2・#3は後続Issueへの引き継ぎ完了)。
+
+**依存**: #21(完了済み)、#25(完了済み)
+
+---
+
+## #28 skills検出ロジックを.agents/skills対応に拡張する(#27の#2から分離)
+
+**概要**: #27の#2の調査で判明した、`.claude/skills`起点の検出だけでは
+実データの多くのパターンを取りこぼす問題を修正する。`.agents/skills/`は
+AgentSkills.io等が推進する実在のクロスツール標準で、`.claude/skills`は
+その Claude Code向け互換レイヤ(ディレクトリ単位または個別スキル単位の
+シンボリックリンク)として運用されているケースが多い。
+
+**実データで確認したパターン(20リポジトリ中)**:
+- `.agents/skills`が実体、`.claude/skills`がそこへのシンボリックリンク
+  (ディレクトリ単位): getsentry/sentry, supabase/supabase, vercel/next.js
+- `.agents/skills`が実体、`.claude/skills`が個別スキルごとのシンボリック
+  リンク(かつ不完全な場合あり): cline/cline, apache/airflow
+- `.claude/skills`が実体、`.agents/skills`がそこへのシンボリックリンク
+  (逆方向): Significant-Gravitas/AutoGPT
+- `.claude/skills`が存在せず`.agents/skills`のみ: OpenHands/OpenHands,
+  sveltejs/svelte, astral-sh/ruff, remix-run/remix
+
+**変更対象ファイル**(たたき台、着手時に確定する)
+- `src/agent_trend_radar/checks.py`(`has_skills_dir`/`skills_count`の
+  ロジックを`.claude/skills`・`.agents/skills`両方を見る方式に変更)
+- `tests/test_checks.py`
+- `SPEC.md`(既知の制限を更新)
+
+**タスク**(たたき台、着手時に確定する)
+- [ ] `.claude/skills`・`.agents/skills`それぞれを(自身がシンボリック
+      リンクの場合は解決した上で)直下要素の集合として取得し、和集合を
+      取る方式に変更する
+- [ ] `has_skills_dir`も同様に両パスの存在を見るように修正する
+- [ ] `.claude/commands`側は`.agents/commands`という対応する標準が
+      存在しないことをWeb調査で確認済みのため対象外とする(SPEC.mdに
+      調査結果を記載)
+- [ ] 実データで検証する(想定される変化: remix-run/remix 0→19、
+      astral-sh/ruff 0→4、OpenHands/OpenHands 0→3、apache/airflow 4→6、
+      cline/cline 6→7、sveltejs/svelte 0→1)
+- [ ] SPEC.mdの既知の制限を更新する
+
+**完了条件**: 上記6リポジトリの`skills_count`が想定通りの値になり、
+既存の正しいケース(sentry/supabase/next.js/AutoGPT/continue/zod)が
+変化しないことをテストで保証する。
+
+**依存**: #21(完了済み)、#25(完了済み)、#27(本Issueの発端)
+
+---
+
+## #29 モノレポでの指示文書(AGENTS.md/CLAUDE.md)網羅性とモノレポ傾向の指標化(#27の#3から分離)
+
+**概要**: #27の#3の調査で、`has_agent_instructions`/`agent_doc_*`系の
+全フィールドがリポジトリルート直下のファイルしか見ておらず、サブ
+ディレクトリに配置された指示文書を一切検知していないことが判明した。
+`has_tests`がモノレポでの検知漏れに対応済み(#14、Git Trees APIによる
+全深度探索)なのと同型のバグ。20リポジトリ中10件でルート外に指示文書が
+存在し、`continuedev/continue`は`has_agent_instructions`の真偽値自体が
+誤っていた(実際はtrue、現状false)。
+
+ユーザーから、この調査を通じて「対象リポジトリにモノレポ構成が一定数
+存在する」という傾向自体も指標として捉えたいという要望があった
+(2026-09-14)。
+
+**実データ(全20リポジトリ、root=ルート直下、nested=サブディレクトリの
+AGENTS.md/CLAUDE.md/.cursorrules数)**:
+
+| repo | root | nested |
+|---|---|---|
+| Significant-Gravitas/AutoGPT | 2 | 19 |
+| apache/airflow | 2 | 14 |
+| oven-sh/bun | 2 | 13 |
+| getsentry/sentry | 2 | 7 |
+| vercel/next.js | 2 | 6 |
+| supabase/supabase | 2 | 6 |
+| remix-run/remix | 2 | 3 |
+| cline/cline | 1 | 2 |
+| crewAIInc/crewAI | 1 | 2 |
+| continuedev/continue | 0 | 1 |
+| (残り10リポジトリ) | — | 0 |
+
+**未確定の設計論点(着手前に検討が必要)**
+- `has_agent_instructions`の真偽値は、`has_tests`と同じ方式(全深度探索
+  でファイル名の存在確認)に拡張すれば単純に直せる
+- `agent_doc_char_count`/`agent_doc_heading_count`等、内容分析系の
+  フィールドをどう扱うかは要検討:
+  - 案A: 全文書を合算した値にする(AutoGPTのように21文書ある場合、
+    LLM分類(#15)に渡す入力が非常に大きくなり、コスト増・#25で判明した
+    非決定性リスクの拡大につながる)
+  - 案B: ルート文書のみ従来通り分析し、`agent_doc_count`(文書数)や
+    `agent_doc_paths`(パス一覧)のような新フィールドで「他にも存在する」
+    ことだけを示す(既存分析ロジック・LLMコストへの影響を抑えられる)
+  - 案C: その他
+- 「モノレポ傾向」の指標化方法(ユーザー要望、着手時に検討):
+  - 案A: パッケージマネージャのワークスペース設定(package.json
+    workspaces、pnpm-workspace.yaml、Cargo workspace等)の有無という
+    決定的シグナルで判定する
+  - 案B: 「AGENTS.md/CLAUDE.mdが複数箇所に存在するか」
+    (`agent_doc_count > 1`等)自体をモノレポの代理指標として使う
+    (新規のAPI呼び出しを増やさずに済む)
+  - 案C: その他
+
+**タスク**(たたき台、着手時に確定する)
+- [ ] `has_agent_instructions`を全深度探索に修正する(最優先、真偽値の
+      誤りを解消)
+- [ ] `agent_doc_char_count`等の内容分析系フィールドの扱い方針を決める
+      (上記案A/B/C)
+- [ ] モノレポ傾向の指標化方針を決める(上記案A/B/C、着手要否を含む)
+- [ ] SCHEMA.md・SPEC.mdに反映する
+
+**完了条件**: 着手時に別途定義する(まずは設計方針の合意が先)。
+
+**依存**: #14(完了済み、同型バグの先例)、#25(完了済み)、#27(本Issueの
 発端)
