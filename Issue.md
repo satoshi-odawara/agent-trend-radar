@@ -353,7 +353,8 @@ Issueは「実装型」「調査・検討型」いずれかのテンプレート
 - [x] #27 分析担当(playbook)からのデータ収集issue案3件への対応(2回目)
       — 2026-09-14 完了。#1は案Cで確定・注意書き追記、#2→#28、
       #3→#29へ切り出し(詳細は末尾セクション参照)
-- [ ] #28 skills検出ロジックを.agents/skills対応に拡張する(#27の#2から
+- [x] #28 skills検出ロジックを.agents/skills対応に拡張する — 2026-09-14
+      実装完了、実データで6リポジトリの想定通りの変化を確認(#27の#2から
       分離、詳細は末尾セクション参照)
 - [ ] #29 モノレポでの指示文書網羅性とモノレポ傾向の指標化(#27の#3から
       分離、設計方針は未確定、詳細は末尾セクション参照)
@@ -1235,30 +1236,37 @@ AgentSkills.io等が推進する実在のクロスツール標準で、`.claude/
 - `.claude/skills`が存在せず`.agents/skills`のみ: OpenHands/OpenHands,
   sveltejs/svelte, astral-sh/ruff, remix-run/remix
 
-**変更対象ファイル**(たたき台、着手時に確定する)
+**変更対象ファイル**
 - `src/agent_trend_radar/checks.py`(`has_skills_dir`/`skills_count`の
   ロジックを`.claude/skills`・`.agents/skills`両方を見る方式に変更)
 - `tests/test_checks.py`
 - `SPEC.md`(既知の制限を更新)
 
-**タスク**(たたき台、着手時に確定する)
-- [ ] `.claude/skills`・`.agents/skills`それぞれを(自身がシンボリック
+**タスク**
+- [x] `.claude/skills`・`.agents/skills`それぞれを(自身がシンボリック
       リンクの場合は解決した上で)直下要素の集合として取得し、和集合を
-      取る方式に変更する
-- [ ] `has_skills_dir`も同様に両パスの存在を見るように修正する
-- [ ] `.claude/commands`側は`.agents/commands`という対応する標準が
-      存在しないことをWeb調査で確認済みのため対象外とする(SPEC.mdに
-      調査結果を記載)
-- [ ] 実データで検証する(想定される変化: remix-run/remix 0→19、
+      取る方式に変更した(`SKILLS_DIRS`リスト化、`skills_count`は
+      各候補パスの`list_immediate_children`結果を`set`で合成)
+- [x] `has_skills_dir`も同様に両パスの存在を見るように修正した
+      (`_any_path_exists`にリストを渡す形に変更)
+- [x] `.claude/commands`側は`.agents/commands`という対応する標準が
+      存在しないことをWeb調査で確認済みのため対象外とした(変更なし、
+      SPEC.mdに調査結果を記載)
+- [x] 実データで検証した。想定通りの値になった: remix-run/remix 0→19、
       astral-sh/ruff 0→4、OpenHands/OpenHands 0→3、apache/airflow 4→6、
-      cline/cline 6→7、sveltejs/svelte 0→1)
-- [ ] SPEC.mdの既知の制限を更新する
+      cline/cline 6→7、sveltejs/svelte 0→1。既存の正しいケース
+      (sentry=28/supabase=22/next.js=21/AutoGPT=10/continue=1/zod=2/
+      bun=9)は変化なしを確認
+- [x] SPEC.mdの既知の制限を更新した(実データで確認した4パターンを記載)
+- [x] ユニットテスト4件を追加(和集合・`.agents/skills`単独・
+      `.claude/commands`非対象の確認は既存踏襲)、全92件パス確認済み
 
 **完了条件**: 上記6リポジトリの`skills_count`が想定通りの値になり、
 既存の正しいケース(sentry/supabase/next.js/AutoGPT/continue/zod)が
-変化しないことをテストで保証する。
+変化しないことをテストで保証する(達成済み、実データ・ユニットテスト
+両方で確認)。
 
-**依存**: #21(完了済み)、#25(完了済み)、#27(本Issueの発端)
+**依存**: #21(完了済み)、#25(完了済み)、#27(完了済み、本Issueの発端)
 
 ---
 

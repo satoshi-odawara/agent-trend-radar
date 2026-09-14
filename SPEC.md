@@ -70,8 +70,8 @@ owner/repoのGitHub API実データ(スター数・作成日)、および各社�
 | has_eval | evals/ / eval/ | エージェントの評価を行っているか |
 | has_ci | .github/workflows/ | CI/CDを回しているか |
 | has_security_policy | SECURITY.md | セキュリティ方針を明示しているか |
-| has_skills_dir | .claude/skills/ | 再利用可能なSkillを定義しているか |
-| skills_count | .claude/skills/直下の子要素数 | Skill定義の充実度 |
+| has_skills_dir | .claude/skills/ または .agents/skills/ | 再利用可能なSkillを定義しているか |
+| skills_count | 両パス直下の子要素数の和集合 | Skill定義の充実度 |
 | has_custom_commands | .claude/commands/ | カスタムslash commandsを定義しているか |
 | custom_commands_count | .claude/commands/配下の.mdファイル数 | カスタムcommand定義の充実度 |
 | has_hooks_config | .claude/settings.jsonの`hooks`キー | エージェントの挙動を機械的に制約する仕組みがあるか |
@@ -104,11 +104,27 @@ CLAUDE.md/AGENTS.mdの内容分析(構造ベース)で既に認めている「�
 Cursorの`.cursor/rules/`等)は今回のスコープに含めていない(将来の拡張
 候補)。
 
-`skills_count`は`.claude/skills/<name>/SKILL.md`というサブディレクトリ
-形式だけでなく、実体を別の場所に置いてシンボリックリンクで
-`.claude/skills/<name>`として公開する形式(実データでcline/cline確認済み)
-もあるため、ファイル種別を問わず`.claude/skills/`直下の子要素数を数える
-方式にしている(SKILL.mdファイル名一致では検知漏れが生じるため)。
+`has_skills_dir`/`skills_count`は`.claude/skills/`と`.agents/skills/`の
+両方を見る(Issue #28、2026-09-14)。`.agents/skills/`はAgentSkills.io等が
+推進するツール非依存の標準で、Codex/Gemini CLI/Cursor/VS Code Copilot/
+Zed等が対応している(Web検索で確認)。実データでは以下のパターンが
+確認できた:
+- `.agents/skills`が実体、`.claude/skills`がそこへのシンボリックリンク
+  (ディレクトリ単位): getsentry/sentry, supabase/supabase, vercel/next.js
+- `.agents/skills`が実体、`.claude/skills`が個別スキルごとのシンボリック
+  リンク(`.agents/skills`側の一部しか反映されず不完全な場合あり):
+  cline/cline, apache/airflow
+- `.claude/skills`が実体、`.agents/skills`がそこへのシンボリックリンク
+  (逆方向): Significant-Gravitas/AutoGPT
+- `.claude/skills`が存在せず`.agents/skills`のみ: OpenHands/OpenHands,
+  sveltejs/svelte, astral-sh/ruff, remix-run/remix
+
+どちらか一方だけでは検知漏れ・過小カウントが起きるため、両パスを
+(自身がシンボリックリンクの場合は解決した上で)調べ、直下の子要素名の
+和集合を数える(`SKILL.md`ファイル名一致では検知漏れが生じるため、
+ファイル種別を問わない)。`.claude/commands/`側は`.agents/commands`と
+いう対応する標準が存在しないことをWeb調査で確認済みのため対象外(将来
+的に標準が現れた場合は再検討)。
 
 ### 廃止した項目とその理由
 

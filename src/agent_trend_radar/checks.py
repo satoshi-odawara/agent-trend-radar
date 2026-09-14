@@ -8,7 +8,7 @@ TEST_DIR_NAMES = {"tests", "test"}
 EVAL_PATHS = ["evals", "eval"]
 CI_PATHS = [".github/workflows"]
 SECURITY_POLICY_PATHS = ["SECURITY.md"]
-SKILLS_DIR = ".claude/skills"
+SKILLS_DIRS = [".claude/skills", ".agents/skills"]
 COMMANDS_DIR = ".claude/commands"
 SETTINGS_PATH = ".claude/settings.json"
 MCP_CONFIG_PATH = ".mcp.json"
@@ -40,22 +40,27 @@ def has_security_policy(client: GitHubClient, repo: str) -> bool:
 
 
 def has_skills_dir(client: GitHubClient, repo: str) -> bool:
-    return client.path_exists(repo, SKILLS_DIR)
+    return _any_path_exists(client, repo, SKILLS_DIRS)
 
 
 def skills_count(client: GitHubClient, repo: str) -> int:
-    """`.claude/skills/`直下の子要素数(Skill 1件 = 1エントリ)。
+    """`.claude/skills/`・`.agents/skills/`直下の子要素の和集合の数
+    (Skill 1件 = 1エントリ)。
 
-    Skillの実体は`<name>/SKILL.md`というサブディレクトリ形式だけでなく、
-    共有先へのシンボリックリンク`<name>`として置かれる場合もあるため
-    (例: cline/cline)、ファイル種別を問わず直下の子要素数を数える。
-    `.claude/skills`自体が共有ディレクトリへのシンボリックリンクに
-    なっている場合(例: getsentry/sentry、supabase/supabase、
-    vercel/next.js。いずれも`../.agents/skills`を指す)は、リンク先を
-    解決してから数える。
+    `.agents/skills/`はAgentSkills.io等が推進するツール非依存の標準で、
+    `.claude/skills`はそのClaude Code向け互換レイヤ(ディレクトリ単位・
+    個別スキル単位いずれかのシンボリックリンク、または逆にこちらが実体で
+    `.agents/skills`側がリンクの場合もある)として運用されているケースが
+    多い(#28、実データで確認)。どちらか一方だけを見ると検知漏れ・過小
+    カウントが起きるため、両パスを(自身がシンボリックリンクの場合は
+    解決した上で)調べ、名前の和集合を数える(同一エントリの二重カウント
+    を避ける)。
     """
-    resolved = _resolve_dir_path(client, repo, SKILLS_DIR)
-    return len(client.list_immediate_children(repo, resolved))
+    children: set[str] = set()
+    for candidate in SKILLS_DIRS:
+        resolved = _resolve_dir_path(client, repo, candidate)
+        children |= client.list_immediate_children(repo, resolved)
+    return len(children)
 
 
 def has_custom_commands(client: GitHubClient, repo: str) -> bool:
