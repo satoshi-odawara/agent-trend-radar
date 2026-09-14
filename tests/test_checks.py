@@ -40,18 +40,25 @@ class FakeGitHubClient:
 
 
 def test_has_agent_instructions_true_for_claude_md():
-    client = FakeGitHubClient(existing_paths={"CLAUDE.md"})
+    client = FakeGitHubClient(file_paths={"CLAUDE.md"})
     assert checks.has_agent_instructions(client, "owner/repo") is True
 
 
 def test_has_agent_instructions_true_for_agents_md():
-    client = FakeGitHubClient(existing_paths={"AGENTS.md"})
+    client = FakeGitHubClient(file_paths={"AGENTS.md"})
     assert checks.has_agent_instructions(client, "owner/repo") is True
 
 
 def test_has_agent_instructions_false_when_none_exist():
     client = FakeGitHubClient()
     assert checks.has_agent_instructions(client, "owner/repo") is False
+
+
+def test_has_agent_instructions_true_for_nested_monorepo_doc():
+    """ルート直下に指示文書が無いモノレポでの検知漏れ対応(#29)。
+    例: continuedev/continueの`extensions/cli/AGENTS.md`。"""
+    client = FakeGitHubClient(file_paths={"extensions/cli/AGENTS.md"})
+    assert checks.has_agent_instructions(client, "owner/repo") is True
 
 
 def test_has_tests_true_when_tests_dir_exists():

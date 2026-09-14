@@ -95,6 +95,35 @@ CLAUDE.mdのシンプルさ優先方針に基づく意図的な割り切りと�
 2026-09-07実装のIssue #14で対応済み(20リポジトリ中19件がtrueに改善、
 falseはyoheinakajima/babyagiのみで実態と一致)。
 
+`has_agent_instructions`も同様にルート直下しか見ておらず、モノレポで
+サブディレクトリにのみ指示文書があるケースを検知できていなかった
+(Issue #29、2026-09-14。`has_tests`の#14対応と同型のバグ)。全深度探索に
+修正し、実データで`continuedev/continue`が`false`→`true`に改善したことを
+確認した(実体は`extensions/cli/AGENTS.md`)。20リポジトリ中10件でルート
+外にも指示文書が存在する(詳細はIssue #29参照)。
+
+これに伴い、`agent_doc_char_count`等の内容分析系フィールドが分析する
+「代表文書」の選定ルールも拡張した: ルート直下にCLAUDE.md/AGENTS.mdが
+あればそれを使う(従来通り)。無ければ、見つかった文書のうち最も浅い
+(同深度ならパス文字列の辞書順で先頭の)ディレクトリを代表として使う。
+複数文書を合算しない方針とした理由は、(a) AutoGPTのように無関係な
+複数文書(`autogpt_platform/`限定の規約と、他の21箇所の文書)を混ぜると
+意味不明な合算値になる、(b) #25で判明したLLM分類(#15)の非決定性リスクを、
+入力を巨大化させることでさらに悪化させたくない、の2点。
+
+新設した`agent_doc_count`は、指示文書が見つかった**ディレクトリ数**
+(重複排除、CLAUDE.md/AGENTS.mdのみ対象で`.cursorrules`は含めない)。
+ファイル数ではなくディレクトリ数にしたのは、`colinhacks/zod`のように
+CLAUDE.md・AGENTS.md・`.cursorrules`をルートに揃えているだけで
+モノレポではないリポジトリを、ファイル数で数えると誤って複数扱いして
+しまうため(実データで判明)。`agent_doc_count > 1`は「指示文書が複数箇所
+に分散している」ことの決定的なシグナルであり、モノレポ構成である
+可能性の代理指標として使える(ユーザー要望、Issue #29)。ただし
+「1」であっても大規模なモノレポでないとは限らない(指示文書自体を
+置いていないだけの可能性がある)点に注意。より正確なモノレポ判定
+(package.json workspaces等のワークスペース設定検知)は将来の拡張候補
+として見送った(Issue #29)。
+
 `has_hooks_config`/`mcp_servers_count`は、ファイル存在だけでなく
 `.claude/settings.json`/`.mcp.json`の中身(JSONキー)まで見て判定する。
 「ファイル存在確認」中心のMVPスコープ方針からはわずかに踏み出すが、
@@ -151,8 +180,11 @@ Zed等が対応している(Web検索で確認)。実データでは以下のパ
 ## CLAUDE.md/AGENTS.md内容分析
 
 `has_agent_instructions`とは別に、CLAUDE.md/AGENTS.mdの中身についても
-分析する。CLAUDE.mdとAGENTS.mdの両方が存在する場合は内容を連結した上で
-1回分析する。どちらも存在しない場合は`agent_doc_char_count`=0、
+分析する。分析対象は「代表文書」1箇所分: リポジトリルートに
+CLAUDE.md/AGENTS.mdがあればそれを使い(両方存在する場合は内容を連結)、
+無ければ見つかった文書のうち最も浅いディレクトリのものを代表とする
+(Issue #29、モノレポでのルート外指示文書への対応)。どちらも見つからない
+場合は`agent_doc_count`=0、`agent_doc_char_count`=0、
 `agent_doc_heading_count`=0、その他の真偽値項目はすべてfalseとする。
 
 ### ルールベース分析(構造ベース)
@@ -161,7 +193,8 @@ Zed等が対応している(Web検索で確認)。実データでは以下のパ
 
 | 項目キー | 何が分かるか | 判定方法 |
 |---|---|---|
-| agent_doc_char_count | 内容の充実度 | 文字数(数値) |
+| agent_doc_count | 指示文書が複数箇所に分散しているか(モノレポ傾向の代理指標) | CLAUDE.md/AGENTS.mdが見つかったディレクトリ数(重複排除、数値) |
+| agent_doc_char_count | 内容の充実度(代表文書1件分) | 文字数(数値) |
 | agent_doc_heading_count | 構成の複雑さ | Markdown見出し(`#`で始まる行)の数(数値) |
 | agent_doc_has_code_block | 具体的なコマンド例があるか | \`\`\`コードブロックの有無 |
 | agent_doc_mentions_test | テスト実行方法への言及 | キーワード一致(大小文字無視): test, pytest, jest, vitest |

@@ -356,8 +356,9 @@ Issueは「実装型」「調査・検討型」いずれかのテンプレート
 - [x] #28 skills検出ロジックを.agents/skills対応に拡張する — 2026-09-14
       実装完了、実データで6リポジトリの想定通りの変化を確認(#27の#2から
       分離、詳細は末尾セクション参照)
-- [ ] #29 モノレポでの指示文書網羅性とモノレポ傾向の指標化(#27の#3から
-      分離、設計方針は未確定、詳細は末尾セクション参照)
+- [x] #29 モノレポでの指示文書網羅性とモノレポ傾向の指標化 — 2026-09-14
+      実装完了。continuedev/continueのhas_agent_instructions誤りを修正、
+      agent_doc_count新設(#27の#3から分離、詳細は末尾セクション参照)
 
 ---
 
@@ -1301,36 +1302,51 @@ AGENTS.md/CLAUDE.md/.cursorrules数)**:
 | continuedev/continue | 0 | 1 |
 | (残り10リポジトリ) | — | 0 |
 
-**未確定の設計論点(着手前に検討が必要)**
-- `has_agent_instructions`の真偽値は、`has_tests`と同じ方式(全深度探索
-  でファイル名の存在確認)に拡張すれば単純に直せる
-- `agent_doc_char_count`/`agent_doc_heading_count`等、内容分析系の
-  フィールドをどう扱うかは要検討:
-  - 案A: 全文書を合算した値にする(AutoGPTのように21文書ある場合、
-    LLM分類(#15)に渡す入力が非常に大きくなり、コスト増・#25で判明した
-    非決定性リスクの拡大につながる)
-  - 案B: ルート文書のみ従来通り分析し、`agent_doc_count`(文書数)や
-    `agent_doc_paths`(パス一覧)のような新フィールドで「他にも存在する」
-    ことだけを示す(既存分析ロジック・LLMコストへの影響を抑えられる)
-  - 案C: その他
-- 「モノレポ傾向」の指標化方法(ユーザー要望、着手時に検討):
-  - 案A: パッケージマネージャのワークスペース設定(package.json
-    workspaces、pnpm-workspace.yaml、Cargo workspace等)の有無という
-    決定的シグナルで判定する
-  - 案B: 「AGENTS.md/CLAUDE.mdが複数箇所に存在するか」
-    (`agent_doc_count > 1`等)自体をモノレポの代理指標として使う
-    (新規のAPI呼び出しを増やさずに済む)
-  - 案C: その他
+**確定した設計方針(2026-09-14、ユーザー確認済み)**
+- 内容分析フィールドは案B'(ルート優先、無ければ最も浅いディレクトリを
+  代表として分析。複数文書の合算はしない)を採用
+- `agent_doc_count`を新設。ただし当初案(ファイル数)には実データによる
+  反例(`colinhacks/zod`はCLAUDE.md・AGENTS.md・`.cursorrules`をルートに
+  揃えているだけでモノレポではないが、ファイル数で数えると2以上になり
+  誤検知する)が見つかったため、**ディレクトリ数(重複排除)**に修正して
+  確定した。対象はCLAUDE.md/AGENTS.mdのみ(`.cursorrules`は含めない)
+- モノレポ傾向の指標化は案B(`agent_doc_count > 1`を代理指標として使う、
+  新規API呼び出しなし)を採用。より正確な判定(ワークスペース設定検知)
+  は将来の拡張候補として見送り
 
-**タスク**(たたき台、着手時に確定する)
-- [ ] `has_agent_instructions`を全深度探索に修正する(最優先、真偽値の
-      誤りを解消)
-- [ ] `agent_doc_char_count`等の内容分析系フィールドの扱い方針を決める
-      (上記案A/B/C)
-- [ ] モノレポ傾向の指標化方針を決める(上記案A/B/C、着手要否を含む)
-- [ ] SCHEMA.md・SPEC.mdに反映する
+**変更対象ファイル**
+- `src/agent_trend_radar/agent_doc_analysis.py`(`find_agent_doc_paths`・
+  `agent_doc_count`新設、`fetch_agent_doc_content`の代表文書選定ロジック
+  拡張)
+- `src/agent_trend_radar/checks.py`(`has_agent_instructions`を全深度探索に)
+- `src/agent_trend_radar/storage.py`(`CHECK_COLUMNS`に`agent_doc_count`追加)
+- `scripts/collect.py`(新フィールドの呼び出し追加)
+- `scripts/report.py`(`NUMERIC_COLUMNS`に追加)
+- `SPEC.md`(チェック項目表・既知の制限に追記)
+- `tests/test_agent_doc_analysis.py`・`tests/test_checks.py`・
+  `tests/test_storage.py`・`tests/test_export_hub_snapshot.py`
 
-**完了条件**: 着手時に別途定義する(まずは設計方針の合意が先)。
+**タスク**
+- [x] `has_agent_instructions`を全深度探索に修正した(`get_file_paths`で
+      全深度のベースネームを見る方式、`has_tests`と同型)
+- [x] 内容分析フィールドの代表文書選定ロジックを実装した(ルート優先、
+      無ければ最も浅い[同深度ならパス辞書順で先頭の]ディレクトリ)
+- [x] `agent_doc_count`(ディレクトリ数)を新設した
+- [x] SPEC.mdに反映した(全深度探索・代表文書選定ルール・
+      `agent_doc_count`の定義とモノレポ代理指標としての注意点)
+- [x] ユニットテスト13件を追加、全100件パス確認済み
+- [x] 実データで検証した。`continuedev/continue`の`has_agent_instructions`
+      がfalse→trueに改善(`extensions/cli/AGENTS.md`の内容
+      [char_count=4302]も正しく取得されるようになった)。
+      `colinhacks/zod`は`agent_doc_count=1`(誤検知なし)、
+      Significant-Gravitas/AutoGPTは`agent_doc_count=13`・
+      `char_count=3822`(ルート文書優先、既存値から変化なし)を確認。
+      root文書がある既存リポジトリの`char_count`はいずれも変化なし
 
-**依存**: #14(完了済み、同型バグの先例)、#25(完了済み)、#27(本Issueの
-発端)
+**完了条件**: `continuedev/continue`のような「ルートに指示文書が無い
+モノレポ」で`has_agent_instructions`が正しくtrueになり、既存の
+root文書を持つリポジトリの内容分析結果(`agent_doc_char_count`等)が
+変化しないことを実データで確認する(達成済み)。
+
+**依存**: #14(完了済み、同型バグの先例)、#25(完了済み)、#27(完了済み、
+本Issueの発端)

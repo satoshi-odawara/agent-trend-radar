@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 DEFAULT_DB_PATH = "data/repo_checks.db"
 
 # #4(ファイル存在5項目) + #5(内容分析8項目) + #15(LLM内容分析4項目)
-# + #21(高度なエージェント運用ツール6項目)
+# + #21(高度なエージェント運用ツール6項目) + #29(agent_doc_count)
 # has_observability_depは#16で廃止(SPEC.md「廃止した項目とその理由」参照)
 CHECK_COLUMNS = [
     "has_agent_instructions",
@@ -13,6 +13,7 @@ CHECK_COLUMNS = [
     "has_eval",
     "has_ci",
     "has_security_policy",
+    "agent_doc_count",
     "agent_doc_char_count",
     "agent_doc_heading_count",
     "agent_doc_has_code_block",

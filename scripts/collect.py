@@ -14,6 +14,7 @@ def run_checks_for_repo(client: GitHubClient, repo: str) -> dict:
         "has_eval": checks.has_eval(client, repo),
         "has_ci": checks.has_ci(client, repo),
         "has_security_policy": checks.has_security_policy(client, repo),
+        "agent_doc_count": agent_doc_analysis.agent_doc_count(client, repo),
         "agent_doc_char_count": agent_doc_analysis.agent_doc_char_count(content),
         "agent_doc_heading_count": agent_doc_analysis.agent_doc_heading_count(content),
         "agent_doc_has_code_block": agent_doc_analysis.agent_doc_has_code_block(content),

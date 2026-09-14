@@ -19,7 +19,14 @@ def _any_path_exists(client: GitHubClient, repo: str, paths: list[str]) -> bool:
 
 
 def has_agent_instructions(client: GitHubClient, repo: str) -> bool:
-    return _any_path_exists(client, repo, AGENT_INSTRUCTION_PATHS)
+    """CLAUDE.md/AGENTS.md/.cursorrulesがリポジトリ内の任意の深さに存在するか。
+
+    モノレポでルート直下に指示文書が無いケース(#29、例:
+    continuedev/continueの`extensions/cli/AGENTS.md`)を検知するため、
+    ルート直下だけでなく全深度を探索する(`has_tests`の#14対応と同型)。
+    """
+    basenames = {path.rsplit("/", 1)[-1] for path in client.get_file_paths(repo)}
+    return not set(AGENT_INSTRUCTION_PATHS).isdisjoint(basenames)
 
 
 def has_tests(client: GitHubClient, repo: str) -> bool:

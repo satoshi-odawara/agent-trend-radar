@@ -17,21 +17,59 @@ TOOL_USAGE_KEYWORDS = [
 ]
 
 
+def find_agent_doc_paths(client: GitHubClient, repo: str) -> list[str]:
+    """リポジトリ内の任意の深さにあるCLAUDE.md/AGENTS.mdのパス一覧を返す(パス文字列の辞書順)。"""
+    return sorted(p for p in client.get_file_paths(repo) if p.rsplit("/", 1)[-1] in AGENT_DOC_PATHS)
+
+
+def agent_doc_count(client: GitHubClient, repo: str) -> int:
+    """CLAUDE.md/AGENTS.mdが見つかったディレクトリの数(重複排除、モノレポ傾向の代理指標)。
+
+    ファイル数ではなくディレクトリ数を数える。ルートにCLAUDE.md/AGENTS.md
+    両方を置く運用(colinhacks/zod等)が一般的にあり、ファイル数で数えると
+    モノレポでなくても2以上になってしまうため(#29で実データにより判明)。
+    """
+    paths = find_agent_doc_paths(client, repo)
+    directories = {p.rsplit("/", 1)[0] if "/" in p else "" for p in paths}
+    return len(directories)
+
+
 def fetch_agent_doc_content(client: GitHubClient, repo: str) -> str:
-    """CLAUDE.md/AGENTS.mdの内容を取得し連結する。どちらもなければ空文字列。
+    """CLAUDE.md/AGENTS.mdの内容を取得し連結する。見つからなければ空文字列。
+
+    リポジトリルートにCLAUDE.md/AGENTS.mdがあればそれを分析対象とする
+    (従来通り)。ルートに無ければ、見つかった文書のうち最も浅い
+    (同じ深さならパス文字列の辞書順で先頭の)ディレクトリを代表として
+    分析する。これはモノレポでルート直下に指示文書が無く
+    `has_agent_instructions`が誤ってfalseになっていた問題(#29、例:
+    continuedev/continueの`extensions/cli/AGENTS.md`)の修正に伴う対応。
 
     CLAUDE.mdをAGENTS.mdへのシンボリックリンクとして運用しているリポジトリ
     (apache/airflow, colinhacks/zodで実際に確認)では両パスが同一内容を
     返すため、重複カウントを避けるために同一内容は1回のみ含める。
     """
+    paths = find_agent_doc_paths(client, repo)
+    if not paths:
+        return ""
+    directory = _representative_directory(paths)
+
     parts = []
     seen = set()
-    for path in AGENT_DOC_PATHS:
+    for filename in AGENT_DOC_PATHS:
+        path = f"{directory}/{filename}" if directory else filename
         content = client.get_file_content(repo, path)
         if content and content not in seen:
             parts.append(content)
             seen.add(content)
     return "\n".join(parts)
+
+
+def _representative_directory(paths: list[str]) -> str:
+    root_paths = [p for p in paths if "/" not in p]
+    if root_paths:
+        return ""
+    shallowest = min(paths, key=lambda p: (p.count("/"), p))
+    return shallowest.rsplit("/", 1)[0]
 
 
 def agent_doc_char_count(content: str) -> int:

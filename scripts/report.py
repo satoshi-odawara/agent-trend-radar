@@ -6,6 +6,7 @@ import sys
 from agent_trend_radar import storage
 
 NUMERIC_COLUMNS = {
+    "agent_doc_count",
     "agent_doc_char_count",
     "agent_doc_heading_count",
     "skills_count",

@@ -2,14 +2,20 @@ from agent_trend_radar import agent_doc_analysis as doc_analysis
 
 
 class FakeGitHubClient:
-    def __init__(self, file_contents=None):
+    def __init__(self, file_contents=None, file_paths=None):
         self._file_contents = file_contents or {}
+        # file_pathsを省略した場合、file_contentsのキー(=内容が存在するパス)を
+        # そのままリポジトリ内の全ファイルパスとして扱う(既存テストとの互換用)。
+        self._file_paths = file_paths if file_paths is not None else set(self._file_contents.keys())
 
     def path_exists(self, repo, path):
         raise NotImplementedError
 
     def get_file_content(self, repo, path):
         return self._file_contents.get(path)
+
+    def get_file_paths(self, repo):
+        return self._file_paths
 
 
 def test_fetch_agent_doc_content_concatenates_both_files():
@@ -39,6 +45,61 @@ def test_fetch_agent_doc_content_dedupes_identical_content():
         file_contents={"CLAUDE.md": same_content, "AGENTS.md": same_content}
     )
     assert doc_analysis.fetch_agent_doc_content(client, "owner/repo") == same_content
+
+
+def test_fetch_agent_doc_content_falls_back_to_shallowest_nested_dir():
+    """ルート直下に指示文書が無いモノレポでの検知漏れ対応(#29)。
+    例: continuedev/continueの`extensions/cli/AGENTS.md`。"""
+    client = FakeGitHubClient(
+        file_contents={"extensions/cli/AGENTS.md": "nested instructions"},
+        file_paths={"extensions/cli/AGENTS.md", "extensions/cli/README.md"},
+    )
+    assert doc_analysis.fetch_agent_doc_content(client, "owner/repo") == "nested instructions"
+
+
+def test_fetch_agent_doc_content_prefers_root_over_nested():
+    client = FakeGitHubClient(
+        file_contents={"AGENTS.md": "root doc", "sub/AGENTS.md": "nested doc"},
+        file_paths={"AGENTS.md", "sub/AGENTS.md"},
+    )
+    assert doc_analysis.fetch_agent_doc_content(client, "owner/repo") == "root doc"
+
+
+def test_fetch_agent_doc_content_picks_shallowest_when_multiple_nested():
+    client = FakeGitHubClient(
+        file_contents={"a/b/AGENTS.md": "deep doc", "a/AGENTS.md": "shallow doc"},
+        file_paths={"a/b/AGENTS.md", "a/AGENTS.md"},
+    )
+    assert doc_analysis.fetch_agent_doc_content(client, "owner/repo") == "shallow doc"
+
+
+def test_find_agent_doc_paths_filters_by_basename_and_sorts():
+    client = FakeGitHubClient(
+        file_paths={"z/AGENTS.md", "a/CLAUDE.md", "a/README.md", "AGENTS.md"},
+    )
+    assert doc_analysis.find_agent_doc_paths(client, "owner/repo") == [
+        "AGENTS.md",
+        "a/CLAUDE.md",
+        "z/AGENTS.md",
+    ]
+
+
+def test_agent_doc_count_counts_distinct_directories_not_files():
+    """CLAUDE.mdとAGENTS.mdが同じディレクトリ(ルート)に揃っているだけの
+    リポジトリ(例: colinhacks/zod)をモノレポと誤検知しないための仕様。"""
+    client = FakeGitHubClient(file_paths={"CLAUDE.md", "AGENTS.md"})
+    assert doc_analysis.agent_doc_count(client, "owner/repo") == 1
+
+
+def test_agent_doc_count_counts_multiple_directories():
+    client = FakeGitHubClient(
+        file_paths={"AGENTS.md", "packages/a/AGENTS.md", "packages/b/CLAUDE.md"},
+    )
+    assert doc_analysis.agent_doc_count(client, "owner/repo") == 3
+
+
+def test_agent_doc_count_zero_when_none_found():
+    assert doc_analysis.agent_doc_count(FakeGitHubClient(), "owner/repo") == 0
 
 
 def test_agent_doc_char_count():
