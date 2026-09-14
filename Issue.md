@@ -343,6 +343,13 @@ Issueは「実装型」「調査・検討型」いずれかのテンプレート
       PAT発行に時間がかかるためローカルスクリプト(`sync_to_hub.ps1`)
       連携に方針転換、実装・実行確認完了(CI版はPAT発行後に別途確認、
       詳細は末尾セクション参照)
+- [x] #25 分析担当(playbook)からのデータ収集issue案3件への対応 —
+      2026-09-14 SCHEMA.md未反映・snapshots上書き・skills_countの
+      シンボリックリンク未解決バグ、3件とも対応完了(LLM分類の非決定性は
+      既知の制限として記録のみ、詳細は末尾セクション参照)
+- [x] #26 agent-trend-data SCHEMA.mdの反映漏れを再発防止する仕組みの構築
+      — 2026-09-14 実装完了(#25の#1で発生した事象を受けて起票、詳細は
+      末尾セクション参照)
 
 ---
 
@@ -1009,3 +1016,122 @@ Secrets未設定のため実行しても失敗する)。
    GitHub Actions版もステップ失敗時のデフォルト挙動により保証)
 
 **依存**: #7(完了済み)、#15(完了済み)、#19(完了済み)
+
+---
+
+## #25 分析担当(playbook)からのデータ収集issue案3件への対応
+
+**概要**: 記事作成システム側(`agent-trend-playbook`)から、収集データの
+品質に関する3件のissue案がユーザー経由で届いた。実データで裏取りした上で
+対応方針をユーザーと協議し、3件とも事実と判断して対応した。
+
+**変更対象ファイル**
+- `agent-trend-data/schema/SCHEMA.md`(v1.1、6フィールド追記+LLM非決定性の補足)
+- `sync_to_hub.ps1`・`.github/workflows/collect-and-publish.yml`
+  (snapshots上書き防止)
+- `src/agent_trend_radar/github_client.py`(`get_symlink_target`新設)
+- `src/agent_trend_radar/checks.py`(`_resolve_dir_path`でシンボリック
+  リンク解決を追加)
+- `tests/test_github_client.py`・`tests/test_checks.py`
+- `README.md`
+
+**受領した3件と対応**:
+
+1. **SCHEMA.md未反映**: Issue #21で追加した6フィールドが
+   `agent-trend-data/schema/SCHEMA.md`に未反映だった(単純な記載漏れ、
+   事実確認)。→ SCHEMA.mdをv1.1に更新して対応(達成済み)。
+
+2. **同日スナップショット上書き**: `snapshots/2026-09-13/`が同日中に
+   2回(07:11→09:32)上書きされ、`agent-trend-data`のCLAUDE.md運用ルール
+   (snapshots配下は追記のみ)に違反していた(事実確認)。検証の過程で、
+   上書きされた差分が`agent_doc_mentions_boundaries`・
+   `agent_doc_mentions_pr_review`という**LLM分類(#15)由来のフィールド
+   のみ**であり、ルールベースのフィールドは一切変化していないことが
+   判明。これは2つの別問題:
+   - a. `sync_to_hub.ps1`/CI版ワークフローの設計バグ →
+     ユーザーと協議の上、「`latest/`は常に最新内容で上書き、
+     `snapshots/<日付>/`は既に存在する場合は上書きせずスキップ
+     (警告のみ)」という挙動に修正した(達成済み)
+   - b. LLM分類(`claude -p`)自体が同一入力に対して非決定的である
+     という、より大きな方法論的論点。今回はSCHEMA.mdに既知の制限として
+     記録するに留め、対応方針(temperature固定・seed指定の可否等)は
+     別途協議することとした(未着手)
+
+3. **has_skills_dir=1 かつ skills_count=0の不整合**: `getsentry/sentry`・
+   `supabase/supabase`・`vercel/next.js`の3件で発生していた(事実確認、
+   原因特定)。原因は`.claude/skills`という**ディレクトリ自体が
+   シンボリックリンク**(3件とも`../.agents/skills`を指す)になっており、
+   既存のシンボリックリンク対応(cline/cline用、ディレクトリ内の個別
+   エントリがシンボリックリンクのケース)ではこの「ディレクトリそのもの
+   がシンボリックリンク」というケースを解決できていなかったため。
+   → `GitHubClient.get_symlink_target`と`checks._resolve_dir_path`を
+   新設し、`.claude/skills`/`.claude/commands`自体がシンボリックリンク
+   の場合はリンク先を解決してから数える方式に修正(達成済み、実データで
+   getsentry/sentry: 0→28、supabase/supabase: 0→22、
+   vercel/next.js: 0→21に修正されたことを確認)。
+
+**タスク**
+- [x] 3件とも実データで事実確認・原因特定した
+- [x] #1: SCHEMA.mdをv1.1に更新(コミット`a55e383`)
+- [x] #2a: `sync_to_hub.ps1`・CI版ワークフローの上書き防止ロジックを実装
+- [x] #2b: LLM非決定性をSCHEMA.mdに既知の制限として記録(対応方針の
+      決定は別途協議、本Issueではここまで)
+- [x] #3: シンボリックリンク解決ロジックを拡張、テスト追加、全84件パス
+- [ ] `sync_to_hub.ps1`を再実行し、修正後の`skills_count`が
+      `agent-trend-data`に正しく反映されることを確認する(ユーザー側で実施)
+
+**完了条件**: #1・#2a・#3が実装され、実データで妥当性を確認している
+(#2bは既知の制限としての記録のみで完了とする)。
+
+**依存**: #21(完了済み)、#24(完了済み)
+
+---
+
+## #26 agent-trend-data SCHEMA.mdの反映漏れを再発防止する仕組みの構築
+
+**概要**: #25の#1で、Issue #21で追加した6フィールドが
+`agent-trend-data/schema/SCHEMA.md`に反映されないまま`sync_to_hub.ps1`
+で実データ連携まで進んでしまう事象が発生した。`agent-trend-data`
+CLAUDE.md自身の運用ルール(「フィールドを追加・変更する際は、この
+ファイルの更新をセットで行う」)があるにもかかわらず、それを機械的に
+強制する仕組みがなく、人手のチェックだけに依存していたことが原因。
+同種の反映漏れが再発しないよう、収集システム側のフィールド定義
+(`storage.CHECK_COLUMNS`)と`agent-trend-data/schema/SCHEMA.md`の記載を
+機械的に突き合わせる仕組みを構築する。
+
+**変更対象ファイル**
+- `scripts/check_hub_schema_sync.py`(新規): `storage.CHECK_COLUMNS`と
+  `agent-trend-data/schema/SCHEMA.md`の「`repos` の各要素」テーブルを
+  パースし、片方にしか存在しないフィールドがあれば非ゼロ終了する
+- `sync_to_hub.ps1`・`.github/workflows/collect-and-publish.yml`:
+  ハブへのファイル更新前にこのチェックを実行し、不一致があれば中断する
+- `tests/test_check_hub_schema_sync.py`(新規)
+
+**着手前の確認事項への回答(2026-09-14、ユーザー確認済み)**:
+「SCHEMA.mdにあってCHECK_COLUMNSにない(廃止済みフィールドの記載残り)」
+はエラーとして中断する方針で確定(双方向の厳密一致)。
+
+**タスク**
+- [x] SCHEMA.mdの「`repos` の各要素」テーブルの1列目
+      (バッククォート内フィールド名)からフィールド名を抽出するパース
+      を実装した。トップレベルの`metrics.json`テーブル
+      (`generated_at`/`repos`)や`manifest.json`テーブル(`dates`)を
+      誤って拾わないよう、セクション見出しでスコープを絞っている
+- [x] `storage.CHECK_COLUMNS`(collect.py側の正)との差分検出ロジックを
+      実装した。CHECK_COLUMNSにあってSCHEMA.mdにない→エラー、
+      SCHEMA.mdにあってCHECK_COLUMNSにない(`report.META_COLUMNS`を除く)
+      →エラー、の双方向とも中断する
+- [x] `sync_to_hub.ps1`・CI版ワークフロー双方で、ハブのファイル更新
+      (latest/snapshots上書き)前のタイミングに組み込んだ
+- [x] チェックにパスしないと後続処理まで進まないことを確認した。
+      実際のSCHEMA.mdから`mcp_servers_count`の記載を意図的に削除した
+      コピーに対して実行し、exit code 1で中断することを確認(実ファイル
+      は変更していない)
+- [x] ユニットテスト5件を追加、全89件パス確認済み
+
+**完了条件**: `storage.CHECK_COLUMNS`にフィールドを追加してSCHEMA.mdを
+更新しないまま`sync_to_hub.ps1`を実行すると、ハブへのファイル更新前に
+検知して中断する(達成済み、上記の意図的な不一致テストで確認)。
+
+**依存**: #21(完了済み)、#24(完了済み)、#25(完了済み、本Issueの
+発端)

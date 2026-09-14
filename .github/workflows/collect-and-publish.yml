@@ -35,10 +35,10 @@ jobs:
       - name: Determine run date
         run: echo "RUN_DATE=$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"
 
-      # agent-trend-data/schema/SCHEMA.mdは2026-09-13時点でTBD(未確定)。
-      # 正式スキーマが決まるまでの暫定措置として、現状の収集結果フォーマット
-      # (report.pyのALL_COLUMNS)をそのままmetrics.jsonとして採用する
-      # (Issue.md #24参照)。
+      # metrics.jsonのフィールド定義はagent-trend-data/schema/SCHEMA.mdが正。
+      # 収集システム側(report.pyのALL_COLUMNS)にフィールドを追加・変更
+      # する際はSCHEMA.mdの更新も同一PR・同一協議でセットで行うこと
+      # (Issue.md #24、playbook起票issue #1参照)。
       - name: Export hub snapshot
         run: uv run scripts/export_hub_snapshot.py hub_export/metrics.json
 
@@ -53,13 +53,25 @@ jobs:
           token: ${{ secrets.HUB_REPO_PAT }}
           path: hub
 
+      # SCHEMA.mdとstorage.CHECK_COLUMNSの不一致をハブ更新前に検知する(#26)
+      - name: Check hub schema sync
+        run: uv run scripts/check_hub_schema_sync.py hub/schema/SCHEMA.md
+
+      # latestは常に最新内容で上書きする。snapshots配下はagent-trend-data
+      # CLAUDE.mdの運用ルールにより追記のみ(過去データを上書きしない)。
+      # 同日に再実行された場合、既存のsnapshotは上書きせずスキップする
+      # (playbook起票issue #2)。
       - name: Update hub snapshot files
         run: |
           set -eu
-          mkdir -p "hub/snapshots/${RUN_DATE}"
-          cp hub_export/metrics.json "hub/snapshots/${RUN_DATE}/metrics.json"
           cp hub_export/metrics.json "hub/latest/metrics.json"
-          uv run scripts/update_hub_manifest.py "hub/manifest.json" "${RUN_DATE}"
+          if [ -f "hub/snapshots/${RUN_DATE}/metrics.json" ]; then
+            echo "::warning::snapshots/${RUN_DATE}/metrics.json は既に存在するため上書きしません(latestのみ更新しました)。"
+          else
+            mkdir -p "hub/snapshots/${RUN_DATE}"
+            cp hub_export/metrics.json "hub/snapshots/${RUN_DATE}/metrics.json"
+            uv run scripts/update_hub_manifest.py "hub/manifest.json" "${RUN_DATE}"
+          fi
 
       - name: Commit and push to hub
         working-directory: hub

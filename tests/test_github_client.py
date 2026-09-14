@@ -122,6 +122,32 @@ def test_get_file_paths_returns_blob_paths_only():
     assert client.get_file_paths("owner/repo") == {".claude/skills/foo/SKILL.md"}
 
 
+def test_get_symlink_target_returns_target_for_symlink():
+    url = "https://api.github.com/repos/owner/repo/contents/.claude/skills"
+    session = FakeSession(
+        {url: FakeResponse(200, json_data={"type": "symlink", "target": "../.agents/skills"})}
+    )
+    client = GitHubClient(token="dummy", session=session)
+
+    assert client.get_symlink_target("owner/repo", ".claude/skills") == "../.agents/skills"
+
+
+def test_get_symlink_target_returns_none_for_regular_directory():
+    url = "https://api.github.com/repos/owner/repo/contents/.claude/skills"
+    session = FakeSession({url: FakeResponse(200, json_data=[{"type": "dir", "name": "foo"}])})
+    client = GitHubClient(token="dummy", session=session)
+
+    assert client.get_symlink_target("owner/repo", ".claude/skills") is None
+
+
+def test_get_symlink_target_returns_none_when_missing():
+    url = "https://api.github.com/repos/owner/repo/contents/.claude/skills"
+    session = FakeSession({url: FakeResponse(404)})
+    client = GitHubClient(token="dummy", session=session)
+
+    assert client.get_symlink_target("owner/repo", ".claude/skills") is None
+
+
 def test_list_immediate_children_includes_symlinks_and_dirs():
     tree = {
         "tree": [

@@ -91,18 +91,25 @@ GitHub Actions経由の自動化はPAT発行後に切り替える(下記参照)�
 
 1. `scripts/collect.py`で収集
 2. `scripts/export_hub_snapshot.py`で収集結果をJSONスナップショットに変換
-   (`agent-trend-data/schema/SCHEMA.md`は2026-09-13時点でTBDのため、
-   スキーマ確定までの暫定措置として現状の収集結果フォーマットをそのまま
-   採用している)
-3. `..\agent-trend-data\snapshots\<実行日>\metrics.json`と
-   `latest\metrics.json`を更新、`scripts/update_hub_manifest.py`で
-   `manifest.json`に実行日を追記(重複追加なし)
+   (フィールド定義は`agent-trend-data/schema/SCHEMA.md`が正。収集システム
+   側にフィールドを追加・変更する際はSCHEMA.mdの更新もセットで行うこと)
+3. `..\agent-trend-data\latest\metrics.json`を常に最新内容で上書き。
+   `snapshots\<実行日>\metrics.json`は追記のみで、同日に既に存在する
+   場合は上書きせずスキップする(`agent-trend-data`のCLAUDE.md運用ルール
+   「snapshots配下は追記のみ」に基づく)。新規作成時のみ
+   `scripts/update_hub_manifest.py`で`manifest.json`に実行日を追記
 4. 変更があれば`agent-trend-data`側でコミット・push
    (`data: <実行日> snapshot`)
 
 収集(`collect.py`)が失敗した場合、スクリプトはそこで停止し、後続の
 ハブへのコピー・push は行われない。ハブへのpushがコンフリクト等で
 失敗した場合はエラーで停止する(自動リトライはしない)。
+
+**既知の制限**: `agent_doc_mentions_repo_structure`〜
+`agent_doc_mentions_release_process`の4フィールドはLLM分類(`claude -p`)
+による判定のため、他フィールドと異なり同一入力でも実行のたびに結果が
+変わりうる(非決定的)。実データで実際に変化する事例を確認済み
+(詳細は`agent-trend-data/schema/SCHEMA.md`参照)。
 
 ### 将来の運用: GitHub Actionsによる自動化(未使用、PAT発行後に有効化)
 

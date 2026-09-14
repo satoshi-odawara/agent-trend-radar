@@ -31,13 +31,28 @@ try {
     $exportPath = Join-Path $repoRoot "hub_export\metrics.json"
     Invoke-Step "ハブ向けスナップショット出力" { uv run scripts/export_hub_snapshot.py $exportPath }
 
-    $snapshotDir = Join-Path $hubPath "snapshots\$runDate"
-    New-Item -ItemType Directory -Force -Path $snapshotDir | Out-Null
-    Copy-Item $exportPath (Join-Path $snapshotDir "metrics.json") -Force
+    # SCHEMA.mdとstorage.CHECK_COLUMNSの不一致をハブ更新前に検知する(#26)
+    $schemaPath = Join-Path $hubPath "schema\SCHEMA.md"
+    Invoke-Step "SCHEMA.md整合性チェック" { uv run scripts/check_hub_schema_sync.py $schemaPath }
+
+    # latestは常に最新内容で上書きする(ドキュメント通り「最新スナップショットのコピー」)
     Copy-Item $exportPath (Join-Path $hubPath "latest\metrics.json") -Force
 
-    $manifestPath = Join-Path $hubPath "manifest.json"
-    Invoke-Step "manifest.json更新" { uv run scripts/update_hub_manifest.py $manifestPath $runDate }
+    # snapshotsはagent-trend-data CLAUDE.mdの運用ルールにより追記のみ
+    # (過去データを上書き・削除しない)。同日に再実行された場合、
+    # 既存のsnapshotは上書きせずスキップする(#playbook起票issue #2)。
+    $snapshotDir = Join-Path $hubPath "snapshots\$runDate"
+    $snapshotFile = Join-Path $snapshotDir "metrics.json"
+    if (Test-Path $snapshotFile) {
+        Write-Warning "snapshots\$runDate\metrics.json は既に存在するため上書きしません(latestのみ更新しました)。"
+    }
+    else {
+        New-Item -ItemType Directory -Force -Path $snapshotDir | Out-Null
+        Copy-Item $exportPath $snapshotFile -Force
+
+        $manifestPath = Join-Path $hubPath "manifest.json"
+        Invoke-Step "manifest.json更新" { uv run scripts/update_hub_manifest.py $manifestPath $runDate }
+    }
 }
 finally {
     Pop-Location

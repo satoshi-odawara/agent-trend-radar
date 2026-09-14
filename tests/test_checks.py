@@ -11,12 +11,14 @@ class FakeGitHubClient:
         file_paths=None,
         file_contents=None,
         immediate_children=None,
+        symlink_targets=None,
     ):
         self._existing_paths = existing_paths or set()
         self._directory_names = directory_names or set()
         self._file_paths = file_paths or set()
         self._file_contents = file_contents or {}
         self._immediate_children = immediate_children or {}
+        self._symlink_targets = symlink_targets or {}
 
     def path_exists(self, repo, path):
         return path in self._existing_paths
@@ -32,6 +34,9 @@ class FakeGitHubClient:
 
     def list_immediate_children(self, repo, dir_path):
         return self._immediate_children.get(dir_path, set())
+
+    def get_symlink_target(self, repo, path):
+        return self._symlink_targets.get(path)
 
 
 def test_has_agent_instructions_true_for_claude_md():
@@ -127,6 +132,17 @@ def test_skills_count_zero_when_no_skills_dir():
     assert checks.skills_count(FakeGitHubClient(), "owner/repo") == 0
 
 
+def test_skills_count_resolves_symlinked_skills_dir():
+    """`.claude/skills`自体が共有ディレクトリへのシンボリックリンクに
+    なっている場合(例: getsentry/sentry, supabase/supabase, vercel/next.js
+    が`../.agents/skills`を指す)、リンク先を解決してから数える。"""
+    client = FakeGitHubClient(
+        symlink_targets={".claude/skills": "../.agents/skills"},
+        immediate_children={".agents/skills": {"foo", "bar", "baz"}},
+    )
+    assert checks.skills_count(client, "owner/repo") == 3
+
+
 def test_has_custom_commands_true_when_exists():
     client = FakeGitHubClient(existing_paths={".claude/commands"})
     assert checks.has_custom_commands(client, "owner/repo") is True
@@ -145,6 +161,14 @@ def test_custom_commands_count_counts_md_files_including_nested():
         }
     )
     assert checks.custom_commands_count(client, "owner/repo") == 2
+
+
+def test_custom_commands_count_resolves_symlinked_commands_dir():
+    client = FakeGitHubClient(
+        symlink_targets={".claude/commands": "../.agents/commands"},
+        file_paths={".agents/commands/deploy.md", ".agents/commands/README.txt"},
+    )
+    assert checks.custom_commands_count(client, "owner/repo") == 1
 
 
 def test_has_hooks_config_true_when_hooks_key_present():

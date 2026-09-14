@@ -1,4 +1,5 @@
 import json
+import posixpath
 
 from agent_trend_radar.github_client import GitHubClient
 
@@ -48,8 +49,13 @@ def skills_count(client: GitHubClient, repo: str) -> int:
     Skillの実体は`<name>/SKILL.md`というサブディレクトリ形式だけでなく、
     共有先へのシンボリックリンク`<name>`として置かれる場合もあるため
     (例: cline/cline)、ファイル種別を問わず直下の子要素数を数える。
+    `.claude/skills`自体が共有ディレクトリへのシンボリックリンクに
+    なっている場合(例: getsentry/sentry、supabase/supabase、
+    vercel/next.js。いずれも`../.agents/skills`を指す)は、リンク先を
+    解決してから数える。
     """
-    return len(client.list_immediate_children(repo, SKILLS_DIR))
+    resolved = _resolve_dir_path(client, repo, SKILLS_DIR)
+    return len(client.list_immediate_children(repo, resolved))
 
 
 def has_custom_commands(client: GitHubClient, repo: str) -> bool:
@@ -57,13 +63,29 @@ def has_custom_commands(client: GitHubClient, repo: str) -> bool:
 
 
 def custom_commands_count(client: GitHubClient, repo: str) -> int:
-    """`.claude/commands/`配下(サブディレクトリによる名前空間分けを含む)の`.md`ファイル数。"""
-    prefix = f"{COMMANDS_DIR}/"
+    """`.claude/commands/`配下(サブディレクトリによる名前空間分けを含む)の`.md`ファイル数。
+
+    `.claude/commands`自体がシンボリックリンクの場合はリンク先を解決する
+    (skills_countと同様の理由)。
+    """
+    resolved = _resolve_dir_path(client, repo, COMMANDS_DIR)
+    prefix = f"{resolved}/"
     return sum(
         1
         for path in client.get_file_paths(repo)
         if path.startswith(prefix) and path.endswith(".md")
     )
+
+
+def _resolve_dir_path(client: GitHubClient, repo: str, dir_path: str) -> str:
+    """dir_path自体がシンボリックリンクの場合、リンク先の実パスに解決する。
+
+    シンボリックリンクでなければdir_pathをそのまま返す。
+    """
+    target = client.get_symlink_target(repo, dir_path)
+    if target is None:
+        return dir_path
+    return posixpath.normpath(posixpath.join(posixpath.dirname(dir_path), target))
 
 
 def has_hooks_config(client: GitHubClient, repo: str) -> bool:

@@ -66,6 +66,22 @@ class GitHubClient:
             if entry.get("type") == "blob"
         }
 
+    def get_symlink_target(self, repo: str, path: str) -> str | None:
+        """pathがシンボリックリンクの場合、そのリンク先(生のtargetテキスト)を返す。
+
+        シンボリックリンクでない場合・存在しない場合はNoneを返す。
+        `.claude/skills`自体がシンボリックリンク(共有先ディレクトリへの
+        リンク)になっているケース(getsentry/sentry等)を解決するため
+        (#21フォローアップ)。
+        """
+        response = self._get_contents(repo, path)
+        if response.status_code != 200:
+            return None
+        data = response.json()
+        if not isinstance(data, dict) or data.get("type") != "symlink":
+            return None
+        return data.get("target")
+
     def list_immediate_children(self, repo: str, dir_path: str) -> set[str]:
         """dir_path直下の子要素のbasename集合を返す(ディレクトリ・ファイル・
         シンボリックリンクいずれも対象)。
