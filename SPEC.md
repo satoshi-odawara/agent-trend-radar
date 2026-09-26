@@ -27,7 +27,11 @@ agent-trend-radarが分析する対象と項目の仕様。見直し方針はCLA
   `adopter`(AIエージェントを使って開発されている一般プロダクト。
   CLAUDE.md/AGENTS.md等の採用が公知の事例のみを選ぶ)を半々程度で混在させ、
   「ツール開発元自身の運用成熟度」と「ツールを使う側の運用成熟度」の両方が
-  比較できるようにする
+  比較できるようにする(ただし2026-09-27のIssue #38対応で、
+  commercial:community比の是正を優先した結果tool12件:adopter16件になった。
+  理由は、`individual_community`/`nonprofit_foundation`に該当するAIエージェント
+  ツール[tool区分]は商用化されやすく該当候補が構造的に少ないため。半々の
+  原則は維持しつつ、実際の候補の見つかりやすさによって崩れうることを許容する)
 - 対象言語エコシステムはPython + TypeScript/JavaScriptに限定する
   (マニフェストファイル(pyproject.toml/package.json等)を用いる将来の
   分析対象を絞るため。当初は`has_observability_dep`のためだったが、
@@ -76,7 +80,8 @@ agent-trend-radarが分析する対象と項目の仕様。見直し方針はCLA
 ## 対象リポジトリリスト(初期・手動)
 
 owner/repoのGitHub API実データ(スター数・作成日)、および各社の資金調達・
-商用プラン有無はWeb検索で裏取り済み(2026-09-06時点)。
+商用プラン有無はWeb検索で裏取り済み(2026-09-06時点。下記8件は2026-09-27
+時点、Issue #38でcommercial:community比の是正のため追加)。
 
 | owner/repo | segment | 収益化モデル | stars | 開始日 | 備考 |
 |---|---|---|---|---|---|
@@ -90,6 +95,8 @@ owner/repoのGitHub API実データ(スター数・作成日)、および各社�
 | OpenHands/OpenHands | tool | commercial_saas | 86,292 | 2024-03-13 | All Hands AI社が$23.8M調達、OpenHands Cloudを課金展開 |
 | browser-use/browser-use | tool | commercial_saas | 112,416 | 2024-10-31 | $17M調達(YC出身)、Cloud APIを従量課金展開 |
 | yoheinakajima/babyagi | tool | individual_community | 22,356 | 2023-04-03 | 個人アカウント(User)所有、商用展開なし |
+| mudler/LocalAI | tool | individual_community | 49,275 | 2023-03-18 | 個人アカウント(User)所有、GitHub Sponsors等のみでVC調達の痕跡なし |
+| oobabooga/text-generation-webui | tool | individual_community | 47,717 | 2022-12-21 | 個人アカウント(User)所有。Gumroadで小規模な拡張機能を個人販売しているが投げ銭に近い規模でVC調達なし |
 | apache/airflow | adopter | nonprofit_foundation | 46,749 | 2015-04-13 | Apache Software Foundation運営 |
 | getsentry/sentry | adopter | commercial_saas | 44,732 | 2010-08-30 | 対象中最古(2010年〜)。商用SaaS(エラートラッキング)で著名 |
 | vercel/next.js | adopter | commercial_saas | 142,129 | 2016-10-05 | Vercelの商用ホスティングプラットフォームと連動 |
@@ -100,6 +107,12 @@ owner/repoのGitHub API実データ(スター数・作成日)、および各社�
 | astral-sh/ruff | adopter | commercial_saas | 49,511 | 2022-08-09 | Astral社が$4M調達、有料エンタープライズ版pyxを展開 |
 | colinhacks/zod | adopter | individual_community | 43,847 | 2020-03-07 | 個人アカウント(User)所有、商用展開なし |
 | remix-run/remix | adopter | big_corp_internal | 33,359 | 2020-10-26 | Shopifyが買収・内製。単体商用製品ではない |
+| nodejs/node | adopter | nonprofit_foundation | 122,108 | 2014-11-26 | OpenJS Foundation運営、AGENTS.md採用 |
+| python/cpython | adopter | nonprofit_foundation | 77,287 | 2017-02-10 | Python Software Foundation運営、AGENTS.md採用。開始日はGitHubミラーリポジトリの作成日(言語自体は1991年〜) |
+| rails/rails | adopter | nonprofit_foundation | 58,780 | 2008-04-11 | Rails Foundation(2022年設立の非営利)運営、AGENTS.md採用 |
+| jupyterlab/jupyterlab | adopter | nonprofit_foundation | 15,321 | 2016-06-03 | Project JupyterはNumFOCUSの財政スポンサー対象、AGENTS.md採用 |
+| pandas-dev/pandas | adopter | nonprofit_foundation | 49,831 | 2010-08-24 | NumFOCUSの財政スポンサー対象、AGENTS.md採用 |
+| babel/babel | adopter | individual_community | 44,030 | 2014-09-28 | Open Collectiveでの寄付運営、商用バッキングの痕跡なし、AGENTS.md採用 |
 
 ## チェック項目(ファイル/ディレクトリの存在有無)
 

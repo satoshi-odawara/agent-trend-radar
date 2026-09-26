@@ -380,7 +380,9 @@ Issueは「実装型」「調査・検討型」いずれかのテンプレート
 - [ ] #35 LLM分類で実際に使用されたモデル名の記録(#30から見送り分)
 - [ ] #36 スナップショット差分レポートのハブへの公開(#31から見送り分)
 - [ ] #37 収集失敗の可視化・追跡(#11から見送り分)
-- [ ] #38 コミュニティ系リポジトリの追加(commercial/communityバランス是正)
+- [x] #38 コミュニティ系リポジトリの追加(commercial/communityバランス是正)
+      — 2026-09-27 実装完了。8件追加(28件体制)、commercial:community=
+      14:14に是正(詳細は末尾セクション参照)
 
 ---
 
@@ -1998,18 +2000,20 @@ community側に8件追加し14:14に是正する。新規追加分もsegment
   リポジトリの選定基準」節の構成比の記述も更新)
 
 **タスク**
-- [ ] SPEC.mdの選定基準(スター数・開始日・言語エコシステム[Python/
+- [x] SPEC.mdの選定基準(スター数・開始日・言語エコシステム[Python/
       TypeScript・JavaScript]・adopterの場合はCLAUDE.md/AGENTS.md採用が
       公知であること)を満たす`individual_community`/`nonprofit_foundation`
       の候補を、tool/adopterそれぞれ4件程度を目安にリストアップし、
       根拠(スター数・開始日・収益化モデルの裏取り、adopterの場合は
       指示文書採用の根拠)とともにユーザーに提示、選定してもらう
-- [ ] 承認を得た候補を`config/targets.yaml`とSPEC.mdの表に追加する
+      — 対応内容参照。tool側は候補が構造的に少なく、最終的にtool2件・
+      adopter6件になった(ユーザー承認済み)
+- [x] 承認を得た候補を`config/targets.yaml`とSPEC.mdの表に追加する
       (#13のチェックリスト: 両ファイルをセットで更新、API呼び出し数への
       影響確認)
-- [ ] `uv run scripts/collect.py`を実行し、新規追加分がエラーなく収集
+- [x] `uv run scripts/collect.py`を実行し、新規追加分がエラーなく収集
       できることを確認する
-- [ ] `reports/api_cost_evaluation.md`を踏まえ、28リポジトリでのAPI
+- [x] `reports/api_cost_evaluation.md`を踏まえ、28リポジトリでのAPI
       呼び出し数が引き続き余裕の範囲内であることを確認する
 
 **完了条件**: `config/targets.yaml`とSPEC.mdの表に8件が追加され、
@@ -2017,3 +2021,52 @@ commercial:community=14:14になっている。追加分の収集が実データ
 エラーなく完了することを確認する。
 
 **依存**: #13(完了済み、追加フローの前提)
+
+**対応内容(2026-09-27)**: 候補調査は並行フォーク2件(tool区分・adopter区分)
+で実施し、GitHub API・WebSearchで実データ裏取りを行った。
+
+- **tool区分**: `individual_community`/`nonprofit_foundation`のAIエージェント
+  ツールは商用化されやすく候補が構造的に少ないことが調査で判明(候補
+  plandex-ai/plandex、assafelovic/gpt-researcher、geekan/MetaGPTはいずれも
+  VC資金調達を確認して除外、neuml/txtaiは商用クラウド版ありで除外、
+  princeton-nlp/SWE-agentは大学研究室運営で区分の趣旨とやや外れる、
+  OpenBMB/ChatDevは商用企業ModelBestとの利益相反懸念で除外推奨)。
+  ユーザーと協議の上、確度の高い2件(mudler/LocalAI、
+  oobabooga/text-generation-webui、いずれも個人[User]アカウント所有で
+  VC調達の痕跡なし)のみ採用し、不足分はadopter区分で補う方針に変更した
+- **adopter区分**: nonprofit_foundation運営でCLAUDE.md/AGENTS.md採用が
+  確認できた候補が豊富に見つかった。当初提示したhome-assistant/core
+  (コードは非営利財団所有だがNabu Casa社が商用クラウド版を販売)・
+  scrapy/scrapy(Zyte社の商用クラウド版あり)は「組織形態と実態の乖離」
+  (既存のApache財団/Ruff/Bunの前例と同型)を理由に除外。axios/axiosは
+  Tidelift・HeroDevsという商用サポート企業からの資金提供が確認できた
+  ため、純粋なコミュニティ運営とは言えないと判断し除外した。最終的に
+  nonprofit_foundation運営の母体(OpenJS Foundation、Python Software
+  Foundation、Rails Foundation、NumFOCUS)が分散するよう6件を選定した
+- 採用した8件全てについて、AGENTS.md/CLAUDE.mdの実在(GitHub API、
+  Tree APIで全深度確認)・stars・作成日をGitHub APIで直接検証した
+  (WebSearchでの裏取りに加え、このセッションでGITHUB_TOKENを使い
+  再確認)
+- `config/targets.yaml`・SPEC.mdの表(選定基準節の構成比についての注記も
+  含む)を更新した
+
+**確認結果**:
+- 最終的な内訳(`config/targets.yaml`、28件): segment tool12件/adopter16件
+  (半々の原則からは崩れるが、tool側候補の構造的な少なさによるものとして
+  SPEC.mdに理由を明記)。monetization_model:
+  commercial_saas12件・individual_community8件・nonprofit_foundation6件・
+  big_corp_internal2件(commercial 14件 : community 14件で均衡達成)
+- テスト: `tests/test_config.py`の`test_load_targets_default_path_reads_real_config`
+  が対象数20件を前提にハードコードしていたため28件に修正。全154件パス
+  (`uv run pytest -q`)
+- 実データ確認(GITHUB_TOKEN利用): `uv run scripts/collect.py`を実行し、
+  28リポジトリ全件が正常完了、`data/collect.log`にエラー・警告なしを
+  確認した。新規8件のデータをスポットチェックし、adopter6件は
+  `has_agent_instructions=1`・`agent_doc_count=1`(想定通り)、
+  tool2件のうちLocalAIは`has_agent_instructions=1`、
+  text-generation-webuiは`has_agent_instructions=0`(tool区分は指示文書
+  採用が選定条件ではないため想定内)であることを確認した
+
+**未完のタスク**: なし。hubへの反映(`sync_to_hub.ps1`)は本Issueの
+タスクに含めておらず未実施(ユーザー側で通常のcollect.pyへの運用として
+実施可能)。

@@ -33,5 +33,5 @@ def test_load_targets_returns_list_of_dicts(tmp_path):
 def test_load_targets_default_path_reads_real_config():
     targets = config.load_targets()
 
-    assert len(targets) == 20
+    assert len(targets) == 28  # Issue #38でcommercial:community比是正のため20→28
     assert all({"repo", "segment", "monetization_model"} <= t.keys() for t in targets)

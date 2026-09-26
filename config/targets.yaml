@@ -32,6 +32,12 @@ targets:
   - repo: yoheinakajima/babyagi
     segment: tool
     monetization_model: individual_community
+  - repo: mudler/LocalAI
+    segment: tool
+    monetization_model: individual_community
+  - repo: oobabooga/text-generation-webui
+    segment: tool
+    monetization_model: individual_community
   - repo: apache/airflow
     segment: adopter
     monetization_model: nonprofit_foundation
@@ -62,3 +68,21 @@ targets:
   - repo: remix-run/remix
     segment: adopter
     monetization_model: big_corp_internal
+  - repo: nodejs/node
+    segment: adopter
+    monetization_model: nonprofit_foundation
+  - repo: python/cpython
+    segment: adopter
+    monetization_model: nonprofit_foundation
+  - repo: rails/rails
+    segment: adopter
+    monetization_model: nonprofit_foundation
+  - repo: jupyterlab/jupyterlab
+    segment: adopter
+    monetization_model: nonprofit_foundation
+  - repo: pandas-dev/pandas
+    segment: adopter
+    monetization_model: nonprofit_foundation
+  - repo: babel/babel
+    segment: adopter
+    monetization_model: individual_community
