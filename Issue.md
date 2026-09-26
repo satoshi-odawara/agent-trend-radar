@@ -380,6 +380,7 @@ Issueは「実装型」「調査・検討型」いずれかのテンプレート
 - [ ] #35 LLM分類で実際に使用されたモデル名の記録(#30から見送り分)
 - [ ] #36 スナップショット差分レポートのハブへの公開(#31から見送り分)
 - [ ] #37 収集失敗の可視化・追跡(#11から見送り分)
+- [ ] #38 コミュニティ系リポジトリの追加(commercial/communityバランス是正)
 
 ---
 
@@ -1977,3 +1978,42 @@ LLM分類4項目の判定は`llm_content_analysis.CLASSIFICATION_FIELDS`を再�
 **完了条件**: 着手時に別途定義する。
 
 **依存**: #11(完了済み、エラーログ出力の基盤)
+
+---
+
+## #38 コミュニティ系リポジトリの追加(commercial/communityバランス是正)
+
+**概要**: 現状の対象20リポジトリは、commercial(`commercial_saas`+
+`big_corp_internal`)14件に対しcommunity(`individual_community`+
+`nonprofit_foundation`)6件と偏っている。「コミュニティ運営と有料
+プロジェクトとで運用成熟度の傾向がかなり違うのではないか」という
+ユーザーの仮説(2026-09-27)を確かめられる比較材料にするため、
+community側に8件追加し14:14に是正する。新規追加分もsegment
+(tool/adopter)をできるだけ半々に保つ(目安: tool4件・adopter4件)。
+#13で整備したチェックリストに沿って進める。
+
+**変更対象ファイル**
+- `config/targets.yaml`(修正: 8件追加)
+- `SPEC.md`(修正: 対象リポジトリリスト表に8件追加。必要なら「対象
+  リポジトリの選定基準」節の構成比の記述も更新)
+
+**タスク**
+- [ ] SPEC.mdの選定基準(スター数・開始日・言語エコシステム[Python/
+      TypeScript・JavaScript]・adopterの場合はCLAUDE.md/AGENTS.md採用が
+      公知であること)を満たす`individual_community`/`nonprofit_foundation`
+      の候補を、tool/adopterそれぞれ4件程度を目安にリストアップし、
+      根拠(スター数・開始日・収益化モデルの裏取り、adopterの場合は
+      指示文書採用の根拠)とともにユーザーに提示、選定してもらう
+- [ ] 承認を得た候補を`config/targets.yaml`とSPEC.mdの表に追加する
+      (#13のチェックリスト: 両ファイルをセットで更新、API呼び出し数への
+      影響確認)
+- [ ] `uv run scripts/collect.py`を実行し、新規追加分がエラーなく収集
+      できることを確認する
+- [ ] `reports/api_cost_evaluation.md`を踏まえ、28リポジトリでのAPI
+      呼び出し数が引き続き余裕の範囲内であることを確認する
+
+**完了条件**: `config/targets.yaml`とSPEC.mdの表に8件が追加され、
+commercial:community=14:14になっている。追加分の収集が実データで
+エラーなく完了することを確認する。
+
+**依存**: #13(完了済み、追加フローの前提)
