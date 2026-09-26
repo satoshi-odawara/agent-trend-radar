@@ -1,7 +1,10 @@
 import base64
+import logging
 
 import pytest
+import requests
 
+from agent_trend_radar import github_client as github_client_module
 from agent_trend_radar.github_client import GitHubClient, GitHubClientError
 
 CONTENTS_URL = "https://api.github.com/repos/owner/repo/contents/CLAUDE.md"
@@ -19,15 +22,32 @@ class FakeResponse:
 
 
 class FakeSession:
+    """URLごとに応答(または例外)を返すフェイク。
+
+    値は単一の`FakeResponse`/`Exception`、またはそのリスト(呼び出しの
+    たびに先頭から消費し、1件になったら以降は同じものを返し続ける)を
+    受け付ける。リトライ挙動のテスト(#11)で、1回目は失敗・2回目は成功
+    といったシーケンスを表現するために使う。
+    """
+
     def __init__(self, responses):
-        self._responses = responses
+        self._responses = {
+            url: (list(value) if isinstance(value, list) else [value])
+            for url, value in responses.items()
+        }
         self.last_headers = None
+        self.last_timeout = None
         self._call_counts: dict[str, int] = {}
 
-    def get(self, url, headers=None):
+    def get(self, url, headers=None, timeout=None):
         self.last_headers = headers
+        self.last_timeout = timeout
         self._call_counts[url] = self._call_counts.get(url, 0) + 1
-        return self._responses[url]
+        queue = self._responses[url]
+        item = queue.pop(0) if len(queue) > 1 else queue[0]
+        if isinstance(item, Exception):
+            raise item
+        return item
 
     def call_count(self, url):
         return self._call_counts.get(url, 0)
@@ -49,7 +69,7 @@ def test_path_exists_false_for_missing_path():
 
 def test_path_exists_raises_on_unexpected_status():
     session = FakeSession({CONTENTS_URL: FakeResponse(500)})
-    client = GitHubClient(token="dummy", session=session)
+    client = GitHubClient(token="dummy", session=session, sleep=lambda seconds: None)
 
     with pytest.raises(GitHubClientError):
         client.path_exists("owner/repo", "CLAUDE.md")
@@ -65,6 +85,107 @@ def test_path_exists_raises_clear_error_on_rate_limit():
 
     with pytest.raises(GitHubClientError, match="レート制限"):
         client.path_exists("owner/repo", "CLAUDE.md")
+
+
+def test_request_passes_timeout():
+    session = FakeSession({CONTENTS_URL: FakeResponse(200, json_data={"type": "file"})})
+    client = GitHubClient(token="dummy", session=session)
+
+    client.path_exists("owner/repo", "CLAUDE.md")
+
+    assert session.last_timeout == github_client_module.DEFAULT_TIMEOUT_SECONDS
+
+
+def test_request_retries_on_network_error_then_succeeds():
+    session = FakeSession(
+        {CONTENTS_URL: [requests.exceptions.ConnectionError("boom"), FakeResponse(200, json_data={"type": "file"})]}
+    )
+    sleeps = []
+    client = GitHubClient(token="dummy", session=session, sleep=sleeps.append)
+
+    assert client.path_exists("owner/repo", "CLAUDE.md") is True
+    assert session.call_count(CONTENTS_URL) == 2
+    assert sleeps == [1]
+
+
+def test_request_raises_after_exhausting_retries_on_network_error():
+    session = FakeSession({CONTENTS_URL: [requests.exceptions.ConnectionError("boom")] * 10})
+    client = GitHubClient(token="dummy", session=session, sleep=lambda seconds: None)
+
+    with pytest.raises(GitHubClientError, match="接続"):
+        client.path_exists("owner/repo", "CLAUDE.md")
+
+
+def test_request_retries_on_5xx_then_succeeds():
+    session = FakeSession({CONTENTS_URL: [FakeResponse(502), FakeResponse(200, json_data={"type": "file"})]})
+    client = GitHubClient(token="dummy", session=session, sleep=lambda seconds: None)
+
+    assert client.path_exists("owner/repo", "CLAUDE.md") is True
+
+
+def test_request_does_not_retry_404():
+    session = FakeSession({CONTENTS_URL: [FakeResponse(404), FakeResponse(200, json_data={"type": "file"})]})
+    client = GitHubClient(token="dummy", session=session, sleep=lambda seconds: None)
+
+    assert client.path_exists("owner/repo", "CLAUDE.md") is False
+    assert session.call_count(CONTENTS_URL) == 1
+
+
+def test_request_does_not_retry_primary_rate_limit():
+    response = FakeResponse(
+        403,
+        headers={"X-RateLimit-Remaining": "0", "X-RateLimit-Reset": "9999999999"},
+    )
+    session = FakeSession({CONTENTS_URL: response})
+    sleeps = []
+    client = GitHubClient(token="dummy", session=session, sleep=sleeps.append)
+
+    with pytest.raises(GitHubClientError, match="レート制限"):
+        client.path_exists("owner/repo", "CLAUDE.md")
+    assert sleeps == []
+    assert session.call_count(CONTENTS_URL) == 1
+
+
+def test_request_retries_on_secondary_rate_limit_then_succeeds():
+    secondary = FakeResponse(403, headers={"Retry-After": "2"})
+    session = FakeSession({CONTENTS_URL: [secondary, FakeResponse(200, json_data={"type": "file"})]})
+    sleeps = []
+    client = GitHubClient(token="dummy", session=session, sleep=sleeps.append)
+
+    assert client.path_exists("owner/repo", "CLAUDE.md") is True
+    assert sleeps == [2]
+
+
+def test_request_raises_after_exhausting_secondary_rate_limit_retries():
+    secondary = FakeResponse(429, headers={"Retry-After": "1"})
+    session = FakeSession({CONTENTS_URL: [secondary] * 10})
+    client = GitHubClient(token="dummy", session=session, sleep=lambda seconds: None)
+
+    with pytest.raises(GitHubClientError, match="二次レート制限"):
+        client.path_exists("owner/repo", "CLAUDE.md")
+
+
+def test_secondary_rate_limit_wait_is_capped():
+    secondary = FakeResponse(429, headers={"Retry-After": "99999"})
+    session = FakeSession({CONTENTS_URL: [secondary, FakeResponse(200, json_data={"type": "file"})]})
+    sleeps = []
+    client = GitHubClient(token="dummy", session=session, sleep=sleeps.append)
+
+    client.path_exists("owner/repo", "CLAUDE.md")
+
+    assert sleeps == [github_client_module.MAX_SECONDARY_RATE_LIMIT_WAIT_SECONDS]
+
+
+def test_request_logs_warning_on_each_retry(caplog):
+    session = FakeSession(
+        {CONTENTS_URL: [requests.exceptions.ConnectionError("boom"), FakeResponse(200, json_data={"type": "file"})]}
+    )
+    client = GitHubClient(token="dummy", session=session, sleep=lambda seconds: None)
+
+    with caplog.at_level(logging.WARNING):
+        client.path_exists("owner/repo", "CLAUDE.md")
+
+    assert "boom" in caplog.text
 
 
 def test_get_file_content_decodes_base64():
@@ -102,7 +223,7 @@ def test_get_directory_names_returns_basenames_at_any_depth():
 
 def test_get_directory_names_raises_on_unexpected_status():
     session = FakeSession({TREE_URL: FakeResponse(500)})
-    client = GitHubClient(token="dummy", session=session)
+    client = GitHubClient(token="dummy", session=session, sleep=lambda seconds: None)
 
     with pytest.raises(GitHubClientError):
         client.get_directory_names("owner/repo")

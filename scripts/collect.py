@@ -1,8 +1,30 @@
+import logging
+import os
 import sys
 from datetime import datetime, timezone
 
 from agent_trend_radar import agent_doc_analysis, checks, config, llm_content_analysis, storage
 from agent_trend_radar.github_client import GitHubClient
+
+LOG_PATH = "data/collect.log"
+
+logger = logging.getLogger(__name__)
+
+
+def configure_logging(log_path: str = LOG_PATH) -> None:
+    """エラー・リトライの発生をファイルに残す(#11)。
+
+    週次自動実行(#10)で失敗が起きても標準出力はCIログにしか残らないため、
+    `github_client`のリトライ警告・収集失敗を`log_path`に追記する。
+    """
+    dirname = os.path.dirname(log_path)
+    if dirname:
+        os.makedirs(dirname, exist_ok=True)
+    logging.basicConfig(
+        level=logging.WARNING,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        handlers=[logging.FileHandler(log_path, encoding="utf-8")],
+    )
 
 
 def run_checks_for_repo(client: GitHubClient, repo: str) -> dict:
@@ -41,6 +63,7 @@ def run_checks_for_repo(client: GitHubClient, repo: str) -> dict:
 
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
+    configure_logging()
     targets = config.load_targets()
     client = GitHubClient()
     conn = storage.connect()
@@ -55,6 +78,7 @@ def main() -> None:
             results = run_checks_for_repo(client, repo)
         except Exception as exc:
             print(f"[{i}/{total}] {repo}: ERROR {exc}")
+            logger.error("%s: %s", repo, exc)
             continue
         storage.insert_repo_check(
             conn,

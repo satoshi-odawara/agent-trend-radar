@@ -8,3 +8,4 @@ __pycache__/
 /hub_export/
 .pytest_cache/
 /data/llm_run_metadata.json
+/data/collect.log

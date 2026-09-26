@@ -1,10 +1,21 @@
 import base64
+import logging
 import os
 import time
+from typing import Callable
 
 import requests
 
 GITHUB_API_BASE = "https://api.github.com"
+
+# #11: タイムアウト・リトライ関連の設定値。リトライ対象はネットワーク
+# エラー・5xx・二次レート制限(乱用防止)のみで、404等のリトライ不可能な
+# エラーや一次レート制限(reset待ちがhttp相当で長い)は対象外。
+DEFAULT_TIMEOUT_SECONDS = 30
+DEFAULT_MAX_RETRIES = 3
+MAX_SECONDARY_RATE_LIMIT_WAIT_SECONDS = 60
+
+logger = logging.getLogger(__name__)
 
 
 class GitHubClientError(Exception):
@@ -16,10 +27,12 @@ class GitHubClient:
         self,
         token: str | None = None,
         session: requests.Session | None = None,
+        sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self._token = token if token is not None else os.environ.get("GITHUB_TOKEN")
         self._session = session or requests.Session()
         self._tree_cache: dict[str, list[dict]] = {}
+        self._sleep = sleep
 
     def path_exists(self, repo: str, path: str) -> bool:
         response = self._get_contents(repo, path)
@@ -135,14 +148,78 @@ class GitHubClient:
         return self._request(url)
 
     def _request(self, url: str) -> requests.Response:
-        response = self._session.get(url, headers=self._headers())
-        if response.status_code == 403 and response.headers.get("X-RateLimit-Remaining") == "0":
-            reset_at = int(response.headers.get("X-RateLimit-Reset", "0"))
-            wait_seconds = max(int(reset_at - time.time()), 0)
-            raise GitHubClientError(
-                f"GitHub APIのレート制限に達しました。約{wait_seconds}秒後にリセットされます。"
-            )
-        return response
+        attempt = 0
+        while True:
+            try:
+                response = self._session.get(
+                    url, headers=self._headers(), timeout=DEFAULT_TIMEOUT_SECONDS
+                )
+            except requests.exceptions.RequestException as exc:
+                if attempt >= DEFAULT_MAX_RETRIES:
+                    raise GitHubClientError(f"GitHub APIへの接続に失敗しました: {exc}") from exc
+                logger.warning(
+                    "GitHub APIへの接続エラー(リトライ%d/%d): %s: %s",
+                    attempt + 1,
+                    DEFAULT_MAX_RETRIES,
+                    url,
+                    exc,
+                )
+                self._sleep(2**attempt)
+                attempt += 1
+                continue
+
+            if response.status_code == 403 and response.headers.get("X-RateLimit-Remaining") == "0":
+                reset_at = int(response.headers.get("X-RateLimit-Reset", "0"))
+                wait_seconds = max(int(reset_at - time.time()), 0)
+                raise GitHubClientError(
+                    f"GitHub APIのレート制限に達しました。約{wait_seconds}秒後にリセットされます。"
+                )
+
+            if self._is_secondary_rate_limited(response):
+                if attempt >= DEFAULT_MAX_RETRIES:
+                    raise GitHubClientError(
+                        "GitHub APIの二次レート制限(乱用防止)に達しました。リトライしても解消しませんでした。"
+                    )
+                retry_after = min(
+                    int(response.headers.get("Retry-After", "1")),
+                    MAX_SECONDARY_RATE_LIMIT_WAIT_SECONDS,
+                )
+                logger.warning(
+                    "GitHub APIの二次レート制限を検知(リトライ%d/%d、%d秒待機): %s",
+                    attempt + 1,
+                    DEFAULT_MAX_RETRIES,
+                    retry_after,
+                    url,
+                )
+                self._sleep(retry_after)
+                attempt += 1
+                continue
+
+            if response.status_code >= 500:
+                if attempt >= DEFAULT_MAX_RETRIES:
+                    return response
+                logger.warning(
+                    "GitHub APIサーバーエラー(リトライ%d/%d): %s -> %d",
+                    attempt + 1,
+                    DEFAULT_MAX_RETRIES,
+                    url,
+                    response.status_code,
+                )
+                self._sleep(2**attempt)
+                attempt += 1
+                continue
+
+            return response
+
+    @staticmethod
+    def _is_secondary_rate_limited(response: requests.Response) -> bool:
+        """GitHubの二次レート制限(乱用防止)を検知する。
+
+        一次レート制限(`X-RateLimit-Remaining: 0`)とは別に、短時間の
+        バースト等で403/429が返り`Retry-After`ヘッダーが付くケース
+        (公式ドキュメントで案内されている挙動)。
+        """
+        return response.status_code in (403, 429) and "Retry-After" in response.headers
 
     def _headers(self) -> dict[str, str]:
         headers = {"Accept": "application/vnd.github+json"}
