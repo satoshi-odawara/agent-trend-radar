@@ -372,6 +372,7 @@ Issueは「実装型」「調査・検討型」いずれかのテンプレート
 - [ ] #34 フィードフォワード/フィードバックの集計ビューの追加
       (agent-trend-playbook調査案R6)
 - [ ] #35 LLM分類で実際に使用されたモデル名の記録(#30から見送り分)
+- [ ] #36 スナップショット差分レポートのハブへの公開(#31から見送り分)
 
 ---
 
@@ -1741,3 +1742,45 @@ LLM分類4項目の判定は`llm_content_analysis.CLASSIFICATION_FIELDS`を再�
 確認する。
 
 **依存**: #30(完了済み、モデル名記録を見送った経緯)
+
+---
+
+## #36 スナップショット差分レポートのハブへの公開(#31から見送り分)
+
+**概要**: #31で`scripts/diff_snapshots.py`を実装したが、出力先は
+`agent-trend-radar/data/latest/changes.md`に留めた。`agent-trend-playbook`
+は`agent-trend-radar`に一切関与しない設計(`agent-trend-playbook/CLAUDE.md`
+「このリポジトリはagent-trend-radarには一切関与しない」)のため、このまま
+では`changes.md`をplaybookが実際に読めない。ハブ(`agent-trend-data`)へ
+公開する配線を追加し、#31が本来意図していた「playbookが記事の候補を
+探す際の入力にする」を実現する。
+
+**変更対象ファイル**
+- `sync_to_hub.ps1`(修正: `scripts/diff_snapshots.py`を実行し、
+  `data/latest/changes.md`を`..\agent-trend-data\latest\changes.md`へ
+  コピーするステップを追加)
+- `.github/workflows/collect-and-publish.yml`(修正: 同様のステップをCI版にも追加)
+- `agent-trend-data/CLAUDE.md`(修正: `latest/`の説明に`changes.md`が
+  含まれることを追記。ディレクトリツリーの変更は伴わない想定)
+- `README.md`(修正: hubへの連携手順の説明に追記)
+
+**タスク**
+- [ ] `changes.md`の公開先を`agent-trend-data/latest/changes.md`とする
+      (`snapshots/<date>/`配下への保存は行わない。理由: `changes.md`は
+      「直近2回の差分」という導出データであり、過去のペアごとの差分を
+      履歴として保存する需要は今のところ無いため。`snapshots/`自体は
+      引き続き完全な生データを保持しているので、過去の任意の2時点間の
+      差分はそこから再計算できる)
+- [ ] `sync_to_hub.ps1`に`diff_snapshots.py`実行とコピーのステップを追加する
+      (`latest/metrics.json`の上書きと同様、`changes.md`も毎回上書きでよい
+      と判断した理由も含め記録する)
+- [ ] `.github/workflows/collect-and-publish.yml`に同様のステップを追加する
+- [ ] `agent-trend-data/CLAUDE.md`に`changes.md`の説明を追記する
+- [ ] 実データで`sync_to_hub.ps1`を実行し、`agent-trend-data/latest/changes.md`
+      が生成されることを確認する
+
+**完了条件**: `sync_to_hub.ps1`(またはCIワークフロー)を実行すると、
+`agent-trend-data/latest/changes.md`が最新の差分内容で生成・更新される
+ことを実データで確認する。
+
+**依存**: #31(完了済み、`diff_snapshots.py`本体)、#24(完了済み、hub連携の基盤)
