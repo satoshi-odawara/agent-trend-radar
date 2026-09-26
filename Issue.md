@@ -369,6 +369,7 @@ Issueは「実装型」「調査・検討型」いずれかのテンプレート
       (agent-trend-playbook調査案R5)
 - [ ] #34 フィードフォワード/フィードバックの集計ビューの追加
       (agent-trend-playbook調査案R6)
+- [ ] #35 LLM分類で実際に使用されたモデル名の記録(#30から見送り分)
 
 ---
 
@@ -1644,3 +1645,47 @@ CLAUDE.md/SPEC.mdが毎回の分類コンテキストに混入している可能
 
 **依存**: #20(未着手、`has_ci`等の解釈と関連)、#21(完了済み、群分類の
 対象項目の多くがここで追加されたもの)
+
+---
+
+## #35 LLM分類で実際に使用されたモデル名の記録(#30から見送り分)
+
+**概要**: #30でLLM分類(`claude -p`)呼び出しのトレーサビリティ用メタデータ
+(`llm_classification`、claude CLIバージョン・分類プロンプトのハッシュ)を
+`metrics.json`トップレベルに追加した際、モデル名の記録は見送った。
+`_run_claude_cli`は`--model`を指定していないため、使用モデルはCLI
+バージョンからは分からず、分類呼び出し自体のJSON出力
+(`modelUsage`キー、#30の実行時確認で`claude-sonnet-5`を確認)からしか
+取得できない。これを記録できるようにする。
+
+優先度は低い(トレーサビリティの補強であり、既存項目の分析には影響しない)。
+
+**変更対象ファイル**
+- `src/agent_trend_radar/llm_content_analysis.py`(修正: `_run_claude_cli`
+  の生JSON出力から`modelUsage`のキー[モデル名]を取り出すヘルパーを追加し、
+  `classify_agent_doc_themes`が4項目の分類結果と合わせてモデル名も返す
+  よう戻り値構造を変更する)
+- `scripts/collect.py`(修正: 各リポジトリの分類呼び出しで得たモデル名を
+  集約し、`collect_run_metadata`/`write_run_metadata`に渡す)
+- `tests/test_llm_content_analysis.py`(修正/新規)
+- `SPEC.md`・`agent-trend-data/schema/SCHEMA.md`(`llm_classification`に
+  `model_name`等を追記)
+
+**タスク**
+- [ ] `_run_claude_cli`のJSON出力(`modelUsage`)からモデル名を取り出す
+      ヘルパーを追加する
+- [ ] `classify_agent_doc_themes`の戻り値構造を、4項目の分類結果と
+      モデル名を両方返せるように変更する(呼び出し側`collect.py`への
+      影響を確認する)
+- [ ] 1回の収集実行内で20リポジトリ全件のモデル名が一致する前提で
+      よいか、異なる場合にどう扱うか(複数値を記録する/警告する等)を
+      着手時に決める
+- [ ] `collect.py`が収集完了後、実際に使われたモデル名を
+      `llm_classification`に含めて記録するようにする
+- [ ] `SPEC.md`・`agent-trend-data/schema/SCHEMA.md`を更新する
+
+**完了条件**: 実データで収集を実行し、`metrics.json`の`llm_classification`
+に実際に使用されたモデル名(例: `claude-sonnet-5`)が記録されることを
+確認する。
+
+**依存**: #30(完了済み、モデル名記録を見送った経緯)
