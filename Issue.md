@@ -366,7 +366,10 @@ Issueは「実装型」「調査・検討型」いずれかのテンプレート
 - [x] #31 スナップショット差分レポートの追加(agent-trend-playbook調査案R3)
       — 2026-09-26 実装完了。出力先は`data/latest/changes.md`に限定
       (ハブへの公開配線は別Issue化、詳細は末尾セクション参照)
-- [ ] #32 未知のエージェント関連規約パスの検出(agent-trend-playbook調査案R4)
+- [x] #32 未知のエージェント関連規約パスの検出(agent-trend-playbook調査案R4)
+      — 2026-09-27 実装完了。実データで9候補パスと既存チェック対象パスの
+      非重複を確認、`.github/copilot-instructions.md`等の実データ発見あり
+      (詳細は末尾セクション参照)
 - [ ] #33 規約ファイル初出コミット日による採用ラグの計測方法の検討
       (agent-trend-playbook調査案R5)
 - [ ] #34 フィードフォワード/フィードバックの集計ビューの追加
@@ -1610,15 +1613,18 @@ LLM分類4項目の判定は`llm_content_analysis.CLASSIFICATION_FIELDS`を再�
 - `tests/test_unknown_paths.py`(新規)
 
 **タスク**
-- [ ] 候補パスの初期リストを確定する(ページ提案の`.cursor/`、
+- [x] 候補パスの初期リストを確定する(ページ提案の`.cursor/`、
       `.github/copilot-instructions.md`、`.github/instructions/`、
       `.clinerules/`、`.windsurfrules`、`GEMINI.md`、`.openhands/`、
       `.claude/agents/`に加え、#21の「将来の拡張候補」記載分と重複整理する)
-- [ ] 各候補パスをディレクトリ/ファイルいずれかとして件数付きで判定する
+      — 対応内容参照。最終的に9件に確定
+- [x] 各候補パスをディレクトリ/ファイルいずれかとして件数付きで判定する
       ロジックを実装する(新規API呼び出しなし、既存Treeキャッシュを再利用)
-- [ ] 20リポジトリ分を集計し、リポジトリ×候補パス×件数の表を
+- [x] 20リポジトリ分を集計し、リポジトリ×候補パス×件数の表を
       `reports/unknown_agent_paths.md`に出力する
-- [ ] 候補にないが実データで見つかった意外なパスがあれば本Issueに記録する
+- [x] 候補にないが実データで見つかった意外なパスがあれば本Issueに記録する
+      — 対応内容参照(候補リスト自体には無かったが、`.clinerules`/
+      `.github/copilot-instructions.md`の実際の広がりが分かった)
 
 **完了条件**: 20リポジトリ分の集計結果が`reports/unknown_agent_paths.md`に
 出力され、既存のチェック対象パス(SPEC.md記載分)が候補から除外されている
@@ -1626,6 +1632,58 @@ LLM分類4項目の判定は`llm_content_analysis.CLASSIFICATION_FIELDS`を再�
 
 **依存**: #21(完了済み、「将来の拡張候補」として`.claude/agents/`・
 `.cursor/rules/`が既出)、#28(完了済み、`.agents/skills`発見の先例)
+
+**対応内容(2026-09-27)**: 着手前の設計確認で以下の点をユーザーと協議し、
+確定した。
+
+1. **候補パスリスト(9件)**: ページ提案の`.cursor/`(ディレクトリ全体)は
+   採用せず、#21の表記に合わせて`.cursor/rules`(AIルール専用のサブパス)
+   のみを候補とした。Windsurfは`.windsurfrules`(単一ファイル)から
+   `.windsurf/rules`(ディレクトリ)への移行が進んでいるため両方を候補に
+   含めた。最終候補: `.cursor/rules`、`.github/copilot-instructions.md`、
+   `.github/instructions`、`.clinerules`、`.windsurfrules`、
+   `.windsurf/rules`、`GEMINI.md`、`.openhands`、`.claude/agents`。
+2. **件数の定義**: ディレクトリ型は配下の全ファイル数を再帰的にカウント
+   (`skills_count`の「直下の子要素数」とは異なる。探索的な検出のため、
+   各ツールのサブディレクトリ規約を個別に調べ込む価値は薄いと判断し、
+   シンプルな再帰カウントに統一した)。ファイル型は存在すれば1、無ければ0。
+3. **API呼び出し**: `collect.py`とは別プロセスのため、実行するとリポジトリ
+   ごとに1回Tree APIを叩く(20リポジトリで20コール)。候補パス数を増やしても
+   1リポジトリあたりの追加コールは発生しない、という意味での「新規API
+   呼び出しなし」であることを確認した。今回は試験的な調査のため許容し、
+   正式なチェック項目に昇格する場合にコール数の節約を検討することとした。
+4. **実行形態**: `collect.py`の週次パイプラインには組み込まない、手動実行
+   の一回限りの調査スクリプト(`reports/api_cost_evaluation.md`等と同じ
+   位置づけ)とした。
+
+**実施内容**: `src/agent_trend_radar/unknown_paths.py`(新規、候補パス
+リスト+`count_candidate`/`detect_unknown_paths`)、
+`scripts/detect_unknown_paths.py`(新規、20リポジトリ分を集計し
+`reports/unknown_agent_paths.md`に出力)を実装。
+
+**確認結果**:
+- テスト: `tests/test_unknown_paths.py`・`tests/test_detect_unknown_paths.py`
+  を新規16件追加、全144件パス(`uv run pytest -q`)
+- 実データ確認(`uv run scripts/detect_unknown_paths.py`、GITHUB_TOKEN
+  利用可能な環境で実施): `reports/unknown_agent_paths.md`を生成。9候補パス
+  はいずれもSPEC.md記載の既存チェック対象パスと重複していないことを確認
+  (完了条件達成)。実データでの発見:
+  - `cline/cline`の`.clinerules`配下に16ファイル(自社ツールを自ら
+    多用している例)
+  - `.github/copilot-instructions.md`が4リポジトリ
+    (Significant-Gravitas/AutoGPT, microsoft/autogen, cline/cline,
+    supabase/supabase)に存在
+  - `apache/airflow`の`.github/instructions`に1ファイル、
+    `OpenHands/OpenHands`の`.openhands`に1ファイル
+  - `.cursor/rules`・`.windsurfrules`・`.windsurf/rules`・`GEMINI.md`・
+    `.claude/agents`は20リポジトリ中いずれも0件
+  - 候補リストの外で目視上「意外」と感じるパスは見つからなかった
+    (Q4での確認どおり、自動検出の対象は固定候補リストに限定しているため、
+    候補外の発見は本質的にできない設計であることに留意)
+
+**未完のタスク**: なし。`.github/copilot-instructions.md`(4/20)・
+`.clinerules`(1/20だが16ファイル)をチェック項目に昇格させるかどうかは
+今回判断せず、人間の判断に委ねる。
 
 ---
 
