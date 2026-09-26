@@ -64,6 +64,30 @@ def fetch_agent_doc_content(client: GitHubClient, repo: str) -> str:
     return "\n".join(parts)
 
 
+def representative_doc_cache_key(client: GitHubClient, repo: str) -> str:
+    """`fetch_agent_doc_content`が読み込む代表文書の入力が前回から変わったかを
+    検知するためのキー(パス+blob SHAの組を連結した文字列)。
+
+    LLM分類(#15)は同一入力でも実行のたびに結果が変わりうる(#25の2b)ため、
+    このキーが前回と同じなのに分類結果が変わっていれば、それは文書の変更
+    ではなくLLMの非決定性によるものと判別できる(#30)。blob SHAは
+    `GitHubClient`が既にキャッシュ済みのTreeから取り出すため、新規API
+    呼び出しは発生しない。文書が見つからない場合は空文字列を返す。
+    """
+    paths = find_agent_doc_paths(client, repo)
+    if not paths:
+        return ""
+    directory = _representative_directory(paths)
+    file_paths = client.get_file_paths(repo)
+
+    entries = []
+    for filename in AGENT_DOC_PATHS:
+        path = f"{directory}/{filename}" if directory else filename
+        if path in file_paths:
+            entries.append(f"{path}:{client.get_file_sha(repo, path)}")
+    return "|".join(entries)
+
+
 def _representative_directory(paths: list[str]) -> str:
     root_paths = [p for p in paths if "/" not in p]
     if root_paths:

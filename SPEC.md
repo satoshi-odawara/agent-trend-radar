@@ -220,6 +220,33 @@ Anthropic APIの従量課金ではなく、Claude Code CLIのヘッドレス実�
 
 ※ このリストは運用しながら見直してよい(CLAUDE.mdの見直し方針を参照)。
 
+### LLM分類の入力キャッシュキーと実行環境の隔離(Issue #30)
+
+LLM分類(`claude -p`)は同一入力でも実行のたびに結果が変わりうる(非決定的、
+#25の2bで実データにより確認)。この非決定性が「文書が変わった」という
+偽の時系列変化として誤読されないよう、以下の2点を実装した。
+
+| 項目キー | 何が分かるか | 判定方法 |
+|---|---|---|
+| agent_doc_llm_cache_key | LLM分類への入力(代表文書)が前回から変わったか | 代表文書のパス+blob SHAの組を連結した文字列。他の項目と異なり真偽値/数値ではなく文字列 |
+
+`agent_doc_llm_cache_key`はLLM分類の結果を左右する項目ではなく、時系列
+比較時に「キーが同じなのに`agent_doc_mentions_*`(LLM分類4項目)の値が
+変わっている」ケースを機械的に検出するためのトレーサビリティ用フィールド
+である。blob SHAはGit Trees APIのキャッシュ済みレスポンスに元々含まれて
+おり、算出に新規API呼び出しは発生しない。
+
+あわせて、`claude -p`呼び出し(`llm_content_analysis._run_claude_cli`)は
+空の一時ディレクトリを`cwd`にし、`--tools ""`で全ツールを無効化する。
+第三者リポジトリのCLAUDE.md/AGENTS.md(信頼できない入力)を渡す際に、
+radar自身のCLAUDE.md/SPEC.mdが分類コンテキストに混入することと、
+プロンプト注入によるツール実行の両方を防ぐ。
+
+使用したclaude CLIバージョン・分類プロンプトのハッシュは、1回の収集実行
+内で全リポジトリ共通の値になるため`repo_checks`(リポジトリ単位)には
+含めず、hubスナップショット(`metrics.json`)のトップレベル
+(`llm_classification`)に1回だけ記録する。
+
 ## データスキーマ
 | 項目 | 内容 |
 |---|---|
@@ -230,6 +257,7 @@ Anthropic APIの従量課金ではなく、Claude Code CLIのヘッドレス実�
 | (ファイル存在系チェック項目キー) | 真偽値(存在する=true) |
 | (CLAUDE.md/AGENTS.md内容分析キー) | 数値(char_count/heading_count) または真偽値 |
 | (エージェント運用ツール項目キー) | 真偽値(has_*)または数値(*_count) |
+| agent_doc_llm_cache_key | 文字列(パス+blob SHAの組、Issue #30) |
 
 ## 保存形式
 - SQLite、テーブル名: `repo_checks`

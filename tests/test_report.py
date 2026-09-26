@@ -40,3 +40,16 @@ def test_render_boolean_stats_excludes_numeric_columns():
     output = report.render_boolean_stats(rows)
     assert "## agent_doc_char_count" not in output
     assert "## agent_doc_heading_count" not in output
+
+
+def test_render_boolean_stats_excludes_text_columns():
+    """agent_doc_llm_cache_keyは文字列(#30)であり、bool()に通すと非空文字列
+    が常にtrue扱いになってしまうため、真偽値集計の対象から除外する。"""
+    rows = [_make_row("a/a", "tool", "commercial_saas", agent_doc_llm_cache_key="CLAUDE.md:sha1")]
+    output = report.render_boolean_stats(rows)
+    assert "## agent_doc_llm_cache_key" not in output
+
+
+def test_format_cell_renders_text_column_as_raw_string():
+    assert report.format_cell("agent_doc_llm_cache_key", "CLAUDE.md:sha1") == "CLAUDE.md:sha1"
+    assert report.format_cell("agent_doc_llm_cache_key", "") == ""

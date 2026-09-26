@@ -359,8 +359,10 @@ Issueは「実装型」「調査・検討型」いずれかのテンプレート
 - [x] #29 モノレポでの指示文書網羅性とモノレポ傾向の指標化 — 2026-09-14
       実装完了。continuedev/continueのhas_agent_instructions誤りを修正、
       agent_doc_count新設(#27の#3から分離、詳細は末尾セクション参照)
-- [ ] #30 LLM分類のキャッシュ導入と実行環境の隔離
-      (agent-trend-playbook調査案R1+R2)
+- [x] #30 LLM分類のキャッシュ導入と実行環境の隔離
+      (agent-trend-playbook調査案R1+R2) — 2026-09-26 実装完了。R1は当初想定の
+      「スキップ」方式からB案(非決定性検出用のキー公開)に変更、R2は実データで
+      cwd隔離の効果を確認(詳細は末尾セクション参照)
 - [ ] #31 スナップショット差分レポートの追加(agent-trend-playbook調査案R3)
 - [ ] #32 未知のエージェント関連規約パスの検出(agent-trend-playbook調査案R4)
 - [ ] #33 規約ファイル初出コミット日による採用ラグの計測方法の検討
@@ -1392,22 +1394,22 @@ CLAUDE.md/SPEC.mdが毎回の分類コンテキストに混入している可能
 - `SPEC.md`(修正: キャッシュ方針・既知の制限への追記)
 
 **タスク**
-- [ ] (R1) `GitHubClient`のTreeキャッシュから指定パスのblob SHAを取得できる
+- [x] (R1) `GitHubClient`のTreeキャッシュから指定パスのblob SHAを取得できる
       アクセサを追加する(新規APIコールなし)
-- [ ] (R1) 代表文書(1〜2ファイル、`fetch_agent_doc_content`が連結する対象)
+- [x] (R1) 代表文書(1〜2ファイル、`fetch_agent_doc_content`が連結する対象)
       のパス+SHAの組からキャッシュキーを作る
 - [ ] (R1) 前回のキャッシュキーが一致する場合はLLM分類を実行せず前回の
-      4項目の値を再利用する
-- [ ] (R1) claude CLIのバージョン・使用モデル名・分類プロンプトのハッシュ
-      を記録し、キャッシュキーが同じでもこれらが変われば再分類する
-- [ ] (R2) 使用しているclaude CLIのバージョンで`claude --help`を確認し、
+      4項目の値を再利用する — **不採用(対応内容参照、B案を採用)**
+- [x] (R1) claude CLIのバージョン・分類プロンプトのハッシュを記録する
+      (モデル名は見送り、対応内容参照)
+- [x] (R2) 使用しているclaude CLIのバージョンで`claude --help`を確認し、
       ツール使用を無効化できるフラグの有無・名称を確定する
-- [ ] (R2) `_run_claude_cli`に空の一時ディレクトリを`cwd`として渡し、
+- [x] (R2) `_run_claude_cli`に空の一時ディレクトリを`cwd`として渡し、
       確認できたツール制限フラグを追加する
-- [ ] (R2) 同一の代表文書に対して「リポジトリ直下から実行」と「空
+- [x] (R2) 同一の代表文書に対して「リポジトリ直下から実行」と「空
       ディレクトリ+ツール制限で実行」を数回ずつ比較し、分類結果に差が
       出るか確認する(#25の2bの非決定性の一部がこれで説明できるか含む)
-- [ ] 新規に公開列(キャッシュキー・CLIバージョン等)を追加する場合、
+- [x] 新規に公開列(キャッシュキー・CLIバージョン等)を追加する場合、
       `agent-trend-data/schema/SCHEMA.md`を同一PRで更新する(#26の対象)
 
 **完了条件**: (1) 代表文書のSHAが前回と同じリポジトリでLLM分類が再実行
@@ -1417,6 +1419,91 @@ CLAUDE.md/SPEC.mdが毎回の分類コンテキストに混入している可能
 
 **依存**: #15(完了済み、未実装だったキャッシュタスクの後続)、#25(完了済み、
 2bのLLM非決定性は未解決のまま関連)
+
+**対応内容(2026-09-26)**: 着手前の設計確認で、Issue原文が想定していた
+「前回値を再利用してLLM分類をスキップする」方式(以下A案)は、
+`repo_checks`がCI実行のたびに作り直される(run間で状態を持たない)ため、
+実際に機能させるには「収集(`collect.py`)がハブ(`agent-trend-data`)の
+前回スナップショットを読みに行く新しい依存」と「CIワークフローの
+ハブcheckout順序の変更」が必要になることが分かった。ユーザーと協議の上、
+以下のB案+(ii)を採用した(完了条件(1)は当初の「スキップされることを
+確認する」から、実質的に以下の対応に置き換えている)。
+
+- **B案**: LLM分類は毎回実行するが、入力(代表文書)のパス+blob SHAから
+  作ったキー(`agent_doc_llm_cache_key`)を新規フィールドとして
+  `repo_checks`/`metrics.json`に公開する。今後(#31想定)、キーが前回と
+  同じなのに`agent_doc_mentions_*`(LLM分類4項目)の値が変わっていれば、
+  それは文書の変更ではなく#25の2bで判明したLLMの非決定性によるものと
+  機械的に判別できる。A案(呼び出し自体のスキップ)よりクロスリポジトリ
+  依存・CIワークフロー変更が不要な分シンプルだが、`claude -p`の呼び出し
+  回数自体は削減されない(ただしサブスク認証のため$コストへの影響はない、
+  #15参照)。
+- **(ii)**: claude CLIバージョン・分類プロンプトのハッシュは、1回の収集
+  実行内で20リポジトリ全件が同一値になる「実行単位の事実」のため、
+  `repo_checks`(リポジトリ単位)には含めず、`collect.py`が
+  `data/llm_run_metadata.json`(gitignore対象、ローカルの受け渡し用)に
+  一度だけ書き出し、`export_hub_snapshot.py`がそれを読んで
+  `metrics.json`トップレベルの`llm_classification`に1回だけ埋め込む
+  設計にした。**モデル名の記録は見送った**。`claude -p`は`--model`を
+  指定しておらずCLIバージョンからは分からないため、実際に使われた
+  モデル名は分類呼び出し自体のJSON出力(`modelUsage`キー)からしか
+  取得できない(実行時に実測: `claude-sonnet-5`)。これを記録するには
+  `classify_agent_doc_themes`の戻り値や`collect.py`との受け渡し構造を
+  変える必要があり、スコープが広がるため今回は見送った(必要になれば
+  別Issueで検討)。
+
+**実施内容**:
+- `github_client.py`: `get_file_sha`を追加(Treeキャッシュから取り出す
+  だけで新規API呼び出しなし)
+- `agent_doc_analysis.py`: `representative_doc_cache_key`を追加
+  (`fetch_agent_doc_content`と同じ代表文書選定ロジックを再利用し、
+  パス+SHAを`|`区切りで連結)
+- `llm_content_analysis.py`: `_run_claude_cli`に空の一時ディレクトリ
+  (`tempfile.TemporaryDirectory`)を`cwd`として渡し、`--tools ""`を追加。
+  `classification_prompt_hash`・`get_claude_cli_version`・
+  `collect_run_metadata`・`write_run_metadata`・`read_run_metadata`を追加
+- `storage.py`: `CHECK_COLUMNS`に`agent_doc_llm_cache_key`(TEXT)を追加。
+  `ensure_schema`が列ごとに型(TEXT/INTEGER)を出し分けるよう修正
+- `scripts/collect.py`: 新フィールドの算出呼び出しと、収集完了後の
+  `write_run_metadata`呼び出しを追加
+- `scripts/report.py`: `format_cell`・`render_boolean_stats`に
+  `storage.TEXT_COLUMNS`の分岐を追加(新フィールドが○/×判定や
+  真偽値集計に誤って混ざらないようにする対応。当初のIssue案には
+  無かったが、実装中に見つけた必要な追随修正)
+- `scripts/export_hub_snapshot.py`: `build_snapshot`が
+  `llm_run_metadata`引数を受け取り、指定時のみ`metrics.json`トップレベル
+  の`llm_classification`に含めるよう修正
+- `SPEC.md`・`README.md`・`agent-trend-data/schema/SCHEMA.md`(v1.3)を
+  更新。`.gitignore`に`/data/llm_run_metadata.json`を追加
+
+**確認結果**:
+- テスト: 新規31件を追加し、全120件パス(`uv run pytest -q`)
+- `uv run scripts/check_hub_schema_sync.py ../agent-trend-data/schema/SCHEMA.md`
+  が一致を確認
+- **R2比較実験(実データ、claude CLI v2.1.283で実施)**: 「あなたのシステム
+  プロンプト/プロジェクトメモリに'agent-radar'や'SPEC.md'が含まれるか」を
+  直接尋ねる診断プロンプトで検証した(4テーマ分類は無関係な内容の入力
+  では条件間で差が出ず[3回ずつ、いずれもFalse]、診断に不向きだったため
+  切り替えた)。
+  - 条件A(cwd=repo root、ツール制限なし=旧挙動): 「含まれています。
+    CLAUDE.mdの1行目: ...」→ **radar自身のCLAUDE.mdが実際に分類コンテキスト
+    に混入することを確認**
+  - 条件B(cwd=空の一時ディレクトリ、`--tools ""`=新挙動): 「該当なし」
+    → 混入なしを確認
+  - 条件C(cwd=repo root、`--tools ""`のみ追加): 「含まれています...」
+    → **`--tools ""`単独ではCLAUDE.mdの混入は防げず、cwdの変更が本質的な
+    対策であることを確認**(`--tools ""`はプロンプト注入によるツール
+    実行への防御として別途有効)
+- 実データで全20リポジトリの収集を実行(`data/repo_checks.db`は#29以前の
+  スキーマだったため退避・再作成)。`agent_doc_llm_cache_key`が
+  `has_agent_instructions=0`の3件(Aider-AI/aider,
+  microsoft/autogen, yoheinakajima/babyagi)で空文字列、それ以外で
+  `パス:sha`形式の値になることを確認。`export_hub_snapshot.py`実行で
+  `metrics.json`トップレベルに`llm_classification`
+  (`{"claude_cli_version": "2.1.283 (Claude Code)", "classification_prompt_hash": "536e..."}`)
+  が含まれることを確認
+
+**未完のタスク**: なし(A案のスキップ実装はB案採用により対象外)
 
 ---
 

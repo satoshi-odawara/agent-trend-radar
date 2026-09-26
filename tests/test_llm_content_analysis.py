@@ -1,8 +1,16 @@
 import json
+import os
 
 import pytest
 
 from agent_trend_radar import llm_content_analysis as llm
+
+
+class _FakeCompletedProcess:
+    def __init__(self, returncode=0, stdout="", stderr=""):
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
 
 
 def _fake_runner(response: dict):
@@ -52,3 +60,65 @@ def test_classify_agent_doc_themes_raises_on_missing_field():
 
     with pytest.raises(llm.LLMClassificationError):
         llm.classify_agent_doc_themes("some content", runner=runner)
+
+
+def test_run_claude_cli_uses_empty_cwd_and_disables_tools(monkeypatch, tmp_path):
+    """収集対象リポジトリと無関係なradar自身のCLAUDE.md/SPEC.mdが分類コンテキスト
+    に混入しないよう、空の一時ディレクトリをcwdにしツールを無効化する(#30, R2)。"""
+    captured = {}
+
+    def fake_run(args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        # 一時ディレクトリはwithブロックを抜けると削除されるため、
+        # 呼び出しの時点(withブロック内)で存在確認する。
+        captured["cwd_existed_during_call"] = os.path.isdir(kwargs.get("cwd", ""))
+        return _FakeCompletedProcess(returncode=0, stdout='{"structured_output": {}}')
+
+    monkeypatch.setattr(llm.subprocess, "run", fake_run)
+
+    llm._run_claude_cli("some content")
+
+    assert captured["kwargs"]["cwd"] is not None
+    assert captured["cwd_existed_during_call"] is True
+    args = captured["args"]
+    assert "--tools" in args
+    assert args[args.index("--tools") + 1] == ""
+
+
+def test_run_claude_cli_raises_on_nonzero_exit(monkeypatch):
+    def fake_run(args, **kwargs):
+        return _FakeCompletedProcess(returncode=1, stdout="", stderr="boom")
+
+    monkeypatch.setattr(llm.subprocess, "run", fake_run)
+
+    with pytest.raises(llm.LLMClassificationError, match="boom"):
+        llm._run_claude_cli("some content")
+
+
+def test_classification_prompt_hash_is_deterministic():
+    assert llm.classification_prompt_hash() == llm.classification_prompt_hash()
+
+
+def test_get_claude_cli_version_returns_stripped_stdout(monkeypatch):
+    def fake_run(args, **kwargs):
+        assert args == ["claude", "--version"]
+        return _FakeCompletedProcess(returncode=0, stdout="2.1.283 (Claude Code)\n")
+
+    monkeypatch.setattr(llm.subprocess, "run", fake_run)
+
+    assert llm.get_claude_cli_version() == "2.1.283 (Claude Code)"
+
+
+def test_write_and_read_run_metadata_roundtrip(tmp_path):
+    path = tmp_path / "llm_run_metadata.json"
+    metadata = {"claude_cli_version": "2.1.283", "classification_prompt_hash": "abc"}
+
+    llm.write_run_metadata(metadata, path=str(path))
+
+    assert llm.read_run_metadata(path=str(path)) == metadata
+
+
+def test_read_run_metadata_returns_empty_dict_when_missing(tmp_path):
+    path = tmp_path / "does_not_exist.json"
+    assert llm.read_run_metadata(path=str(path)) == {}

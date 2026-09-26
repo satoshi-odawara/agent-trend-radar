@@ -170,6 +170,38 @@ def test_list_immediate_children_empty_when_dir_missing():
     assert client.list_immediate_children("owner/repo", ".claude/skills") == set()
 
 
+def test_get_file_sha_returns_blob_sha_for_existing_path():
+    tree = {
+        "tree": [
+            {"path": "CLAUDE.md", "type": "blob", "sha": "abc123"},
+            {"path": "AGENTS.md", "type": "blob", "sha": "def456"},
+        ]
+    }
+    session = FakeSession({TREE_URL: FakeResponse(200, json_data=tree)})
+    client = GitHubClient(token="dummy", session=session)
+
+    assert client.get_file_sha("owner/repo", "CLAUDE.md") == "abc123"
+
+
+def test_get_file_sha_returns_none_for_missing_path():
+    tree = {"tree": [{"path": "CLAUDE.md", "type": "blob", "sha": "abc123"}]}
+    session = FakeSession({TREE_URL: FakeResponse(200, json_data=tree)})
+    client = GitHubClient(token="dummy", session=session)
+
+    assert client.get_file_sha("owner/repo", "AGENTS.md") is None
+
+
+def test_get_file_sha_reuses_cached_tree_no_extra_request():
+    tree = {"tree": [{"path": "CLAUDE.md", "type": "blob", "sha": "abc123"}]}
+    session = FakeSession({TREE_URL: FakeResponse(200, json_data=tree)})
+    client = GitHubClient(token="dummy", session=session)
+
+    client.get_file_paths("owner/repo")
+    client.get_file_sha("owner/repo", "CLAUDE.md")
+
+    assert session.call_count(TREE_URL) == 1
+
+
 def test_tree_entries_are_cached_per_repo():
     """get_directory_names/get_file_pathsを同じrepoに対して呼んでも、
     Git Trees APIへのリクエストは1回に抑えられる(#21、API呼び出し数の抑制)。"""

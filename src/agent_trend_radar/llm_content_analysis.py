@@ -1,6 +1,11 @@
+import hashlib
 import json
+import os
 import subprocess
+import tempfile
 from typing import Callable
+
+DEFAULT_RUN_METADATA_PATH = "data/llm_run_metadata.json"
 
 CLASSIFICATION_FIELDS = [
     "agent_doc_mentions_repo_structure",
@@ -83,25 +88,74 @@ def classify_agent_doc_themes(
 
 
 def _run_claude_cli(content: str) -> str:
-    result = subprocess.run(
-        [
-            "claude",
-            "-p",
-            CLASSIFICATION_PROMPT,
-            "--output-format",
-            "json",
-            "--json-schema",
-            json.dumps(CLASSIFICATION_SCHEMA),
-            "--permission-prompts",
-            "none",
-        ],
-        input=content,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-    )
+    """第三者リポジトリのCLAUDE.md/AGENTS.md(信頼できない入力)を渡すため、
+    空の一時ディレクトリをcwdにしツールを全て無効化する(`--tools ""`)。
+    これにより、radar自身のCLAUDE.md/SPEC.mdが分類コンテキストに混入する
+    ことと、プロンプト注入によるツール実行の両方を防ぐ(#30、R2)。
+    """
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        result = subprocess.run(
+            [
+                "claude",
+                "-p",
+                CLASSIFICATION_PROMPT,
+                "--output-format",
+                "json",
+                "--json-schema",
+                json.dumps(CLASSIFICATION_SCHEMA),
+                "--permission-prompts",
+                "none",
+                "--tools",
+                "",
+            ],
+            input=content,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            cwd=tmp_dir,
+        )
     if result.returncode != 0:
         raise LLMClassificationError(
             f"claude CLIがエラー終了しました(code={result.returncode}): {result.stderr}"
         )
     return result.stdout
+
+
+def classification_prompt_hash() -> str:
+    """分類プロンプトのSHA256ハッシュ。プロンプト変更を追跡するためのもの
+    (#30)。プロンプト自体は本モジュール内の定数のため常に決定的。
+    """
+    return hashlib.sha256(CLASSIFICATION_PROMPT.encode("utf-8")).hexdigest()
+
+
+def get_claude_cli_version() -> str:
+    """使用しているclaude CLIのバージョン文字列(`claude --version`の出力)。"""
+    result = subprocess.run(["claude", "--version"], capture_output=True, text=True, encoding="utf-8")
+    return result.stdout.strip()
+
+
+def collect_run_metadata() -> dict:
+    """1回の収集実行につき1回だけ記録すればよい、LLM分類のトレーサビリティ
+    用メタデータ(CLIバージョン・プロンプトハッシュ)。20リポジトリ全件で
+    同一の値になるため、`repo_checks`(リポジトリ単位)ではなくこの関数の
+    戻り値をhubスナップショットのトップレベルに1回だけ記録する(#30)。
+    """
+    return {
+        "claude_cli_version": get_claude_cli_version(),
+        "classification_prompt_hash": classification_prompt_hash(),
+    }
+
+
+def write_run_metadata(metadata: dict, path: str = DEFAULT_RUN_METADATA_PATH) -> None:
+    dirname = os.path.dirname(path)
+    if dirname:
+        os.makedirs(dirname, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(metadata, f, ensure_ascii=False, indent=2)
+
+
+def read_run_metadata(path: str = DEFAULT_RUN_METADATA_PATH) -> dict:
+    if not os.path.exists(path):
+        return {}
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)

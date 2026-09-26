@@ -99,6 +99,18 @@ class GitHubClient:
                 children.add(path[len(prefix):].split("/", 1)[0])
         return children
 
+    def get_file_sha(self, repo: str, path: str) -> str | None:
+        """キャッシュ済みTreeエントリから指定パスのblob SHAを返す。存在しなければNone。
+
+        Git Trees APIのレスポンスには元々各エントリのblob SHAが含まれており、
+        `_get_tree_entries`で既にキャッシュ済みのため、新規API呼び出しは
+        発生しない(#30、LLM分類の入力キャッシュキー算出に使う)。
+        """
+        for entry in self._get_tree_entries(repo):
+            if entry.get("type") == "blob" and entry.get("path") == path:
+                return entry.get("sha")
+        return None
+
     def _get_tree_entries(self, repo: str) -> list[dict]:
         """Git Trees APIのrecursive=1を1リクエストで取得し、リポジトリ単位でキャッシュする。
 

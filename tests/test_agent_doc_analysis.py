@@ -2,11 +2,12 @@ from agent_trend_radar import agent_doc_analysis as doc_analysis
 
 
 class FakeGitHubClient:
-    def __init__(self, file_contents=None, file_paths=None):
+    def __init__(self, file_contents=None, file_paths=None, file_shas=None):
         self._file_contents = file_contents or {}
         # file_pathsを省略した場合、file_contentsのキー(=内容が存在するパス)を
         # そのままリポジトリ内の全ファイルパスとして扱う(既存テストとの互換用)。
         self._file_paths = file_paths if file_paths is not None else set(self._file_contents.keys())
+        self._file_shas = file_shas or {}
 
     def path_exists(self, repo, path):
         raise NotImplementedError
@@ -16,6 +17,9 @@ class FakeGitHubClient:
 
     def get_file_paths(self, repo):
         return self._file_paths
+
+    def get_file_sha(self, repo, path):
+        return self._file_shas.get(path)
 
 
 def test_fetch_agent_doc_content_concatenates_both_files():
@@ -151,3 +155,46 @@ def test_agent_doc_mentions_tool_usage():
 def test_keyword_matching_is_case_insensitive():
     assert doc_analysis.agent_doc_mentions_test("PYTEST") is True
     assert doc_analysis.agent_doc_mentions_tool_usage("SUBAGENT") is True
+
+
+def test_representative_doc_cache_key_empty_when_no_doc():
+    client = FakeGitHubClient()
+    assert doc_analysis.representative_doc_cache_key(client, "owner/repo") == ""
+
+
+def test_representative_doc_cache_key_single_file():
+    client = FakeGitHubClient(
+        file_paths={"CLAUDE.md"}, file_shas={"CLAUDE.md": "sha-claude"}
+    )
+    assert doc_analysis.representative_doc_cache_key(client, "owner/repo") == "CLAUDE.md:sha-claude"
+
+
+def test_representative_doc_cache_key_combines_both_files_in_fixed_order():
+    client = FakeGitHubClient(
+        file_paths={"CLAUDE.md", "AGENTS.md"},
+        file_shas={"CLAUDE.md": "sha-claude", "AGENTS.md": "sha-agents"},
+    )
+    assert (
+        doc_analysis.representative_doc_cache_key(client, "owner/repo")
+        == "CLAUDE.md:sha-claude|AGENTS.md:sha-agents"
+    )
+
+
+def test_representative_doc_cache_key_uses_representative_directory():
+    """ルート直下に無いモノレポでは代表ディレクトリ配下のパス+SHAを使う(#29と同じ選定ロジック)。"""
+    client = FakeGitHubClient(
+        file_paths={"extensions/cli/AGENTS.md", "extensions/cli/README.md"},
+        file_shas={"extensions/cli/AGENTS.md": "sha-nested"},
+    )
+    assert (
+        doc_analysis.representative_doc_cache_key(client, "owner/repo")
+        == "extensions/cli/AGENTS.md:sha-nested"
+    )
+
+
+def test_representative_doc_cache_key_changes_when_sha_changes():
+    client_v1 = FakeGitHubClient(file_paths={"CLAUDE.md"}, file_shas={"CLAUDE.md": "sha-v1"})
+    client_v2 = FakeGitHubClient(file_paths={"CLAUDE.md"}, file_shas={"CLAUDE.md": "sha-v2"})
+    key_v1 = doc_analysis.representative_doc_cache_key(client_v1, "owner/repo")
+    key_v2 = doc_analysis.representative_doc_cache_key(client_v2, "owner/repo")
+    assert key_v1 != key_v2

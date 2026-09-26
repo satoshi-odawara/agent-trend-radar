@@ -109,7 +109,10 @@ GitHub Actions経由の自動化はPAT発行後に切り替える(下記参照)�
 `agent_doc_mentions_release_process`の4フィールドはLLM分類(`claude -p`)
 による判定のため、他フィールドと異なり同一入力でも実行のたびに結果が
 変わりうる(非決定的)。実データで実際に変化する事例を確認済み
-(詳細は`agent-trend-data/schema/SCHEMA.md`参照)。
+(詳細は`agent-trend-data/schema/SCHEMA.md`参照)。`agent_doc_llm_cache_key`
+(LLM分類への入力パス+blob SHA)が前回のスナップショットと同じなのに
+この4フィールドの値が変わっていた場合、それは指示文書の変更ではなく
+LLMの非決定性によるものと判別できる(Issue #30)。
 
 ### 将来の運用: GitHub Actionsによる自動化(未使用、PAT発行後に有効化)
 

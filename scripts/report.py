@@ -38,6 +38,8 @@ def format_cell(column: str, value) -> str:
         return str(value)
     if column in META_COLUMNS:
         return str(value)
+    if column in storage.TEXT_COLUMNS:
+        return str(value) if value else ""
     return "✓" if value else ""
 
 
@@ -97,7 +99,11 @@ def render_boolean_stats(rows: list[tuple]) -> str:
     """
     segment_idx = ALL_COLUMNS.index("segment")
     monetization_idx = ALL_COLUMNS.index("monetization_model")
-    boolean_columns = [col for col in storage.CHECK_COLUMNS if col not in NUMERIC_COLUMNS]
+    boolean_columns = [
+        col
+        for col in storage.CHECK_COLUMNS
+        if col not in NUMERIC_COLUMNS and col not in storage.TEXT_COLUMNS
+    ]
 
     sections = []
     for column in boolean_columns:

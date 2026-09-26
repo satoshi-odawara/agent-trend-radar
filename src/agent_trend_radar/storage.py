@@ -32,7 +32,12 @@ CHECK_COLUMNS = [
     "custom_commands_count",
     "has_hooks_config",
     "mcp_servers_count",
+    "agent_doc_llm_cache_key",
 ]
+
+# CHECK_COLUMNSの大半は真偽値(0/1)・件数(整数)だが、agent_doc_llm_cache_key
+# だけはLLM分類(#15)の入力(パス+blob SHA)を示す文字列(#30)。
+TEXT_COLUMNS = {"agent_doc_llm_cache_key"}
 
 
 def connect(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
@@ -42,8 +47,12 @@ def connect(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
     return sqlite3.connect(db_path)
 
 
+def _column_type(col: str) -> str:
+    return "TEXT" if col in TEXT_COLUMNS else "INTEGER"
+
+
 def ensure_schema(conn: sqlite3.Connection) -> None:
-    columns_sql = ",\n            ".join(f"{col} INTEGER" for col in CHECK_COLUMNS)
+    columns_sql = ",\n            ".join(f"{col} {_column_type(col)}" for col in CHECK_COLUMNS)
     conn.execute(
         f"""
         CREATE TABLE IF NOT EXISTS repo_checks (

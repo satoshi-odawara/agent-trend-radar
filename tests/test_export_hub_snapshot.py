@@ -29,6 +29,7 @@ SAMPLE_CHECKS = {
     "custom_commands_count": 3,
     "has_hooks_config": False,
     "mcp_servers_count": 0,
+    "agent_doc_llm_cache_key": "CLAUDE.md:abc123",
 }
 
 
@@ -61,3 +62,19 @@ def test_build_snapshot_maps_columns_to_repo_dict():
         value = SAMPLE_CHECKS[col]
         expected[col] = int(value) if isinstance(value, bool) else value
     assert snapshot["repos"] == [expected]
+
+
+def test_build_snapshot_includes_llm_run_metadata_when_provided():
+    metadata = {"claude_cli_version": "2.1.283", "classification_prompt_hash": "abc"}
+    snapshot = export_hub_snapshot.build_snapshot(_memory_conn(), llm_run_metadata=metadata)
+    assert snapshot["llm_classification"] == metadata
+
+
+def test_build_snapshot_omits_llm_run_metadata_when_not_provided():
+    snapshot = export_hub_snapshot.build_snapshot(_memory_conn())
+    assert "llm_classification" not in snapshot
+
+
+def test_build_snapshot_omits_llm_run_metadata_when_empty():
+    snapshot = export_hub_snapshot.build_snapshot(_memory_conn(), llm_run_metadata={})
+    assert "llm_classification" not in snapshot

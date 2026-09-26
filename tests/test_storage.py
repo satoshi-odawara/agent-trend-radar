@@ -28,6 +28,7 @@ SAMPLE_CHECKS = {
     "custom_commands_count": 3,
     "has_hooks_config": False,
     "mcp_servers_count": 0,
+    "agent_doc_llm_cache_key": "CLAUDE.md:abc123",
 }
 
 
@@ -108,6 +109,23 @@ def test_two_runs_accumulate_two_rows():
         "SELECT COUNT(*) FROM repo_checks WHERE repo = 'owner/repo'"
     ).fetchone()[0]
     assert count == 2
+
+
+def test_insert_repo_check_stores_llm_cache_key_as_text():
+    """agent_doc_llm_cache_keyは他のCHECK_COLUMNSと異なり文字列(#30)。
+    空文字列(文書なし)も含めてそのまま保存・復元できること。"""
+    conn = _memory_conn()
+    checks_without_doc = {**SAMPLE_CHECKS, "agent_doc_llm_cache_key": ""}
+    storage.insert_repo_check(
+        conn,
+        repo="owner/repo",
+        segment="tool",
+        monetization_model="commercial_saas",
+        checks=checks_without_doc,
+        checked_at="2026-09-06T00:00:00+00:00",
+    )
+    value = conn.execute("SELECT agent_doc_llm_cache_key FROM repo_checks").fetchone()[0]
+    assert value == ""
 
 
 def test_connect_creates_parent_directory(tmp_path):

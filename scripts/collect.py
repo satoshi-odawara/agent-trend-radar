@@ -35,6 +35,7 @@ def run_checks_for_repo(client: GitHubClient, repo: str) -> dict:
         "custom_commands_count": checks.custom_commands_count(client, repo),
         "has_hooks_config": checks.has_hooks_config(client, repo),
         "mcp_servers_count": checks.mcp_servers_count(client, repo),
+        "agent_doc_llm_cache_key": agent_doc_analysis.representative_doc_cache_key(client, repo),
     }
 
 
@@ -66,6 +67,7 @@ def main() -> None:
         print(f"[{i}/{total}] {repo}: done")
 
     conn.close()
+    llm_content_analysis.write_run_metadata(llm_content_analysis.collect_run_metadata())
 
 
 if __name__ == "__main__":
