@@ -363,7 +363,9 @@ Issueは「実装型」「調査・検討型」いずれかのテンプレート
       (agent-trend-playbook調査案R1+R2) — 2026-09-26 実装完了。R1は当初想定の
       「スキップ」方式からB案(非決定性検出用のキー公開)に変更、R2は実データで
       cwd隔離の効果を確認(詳細は末尾セクション参照)
-- [ ] #31 スナップショット差分レポートの追加(agent-trend-playbook調査案R3)
+- [x] #31 スナップショット差分レポートの追加(agent-trend-playbook調査案R3)
+      — 2026-09-26 実装完了。出力先は`data/latest/changes.md`に限定
+      (ハブへの公開配線は別Issue化、詳細は末尾セクション参照)
 - [ ] #32 未知のエージェント関連規約パスの検出(agent-trend-playbook調査案R4)
 - [ ] #33 規約ファイル初出コミット日による採用ラグの計測方法の検討
       (agent-trend-playbook調査案R5)
@@ -1524,13 +1526,16 @@ CLAUDE.md/SPEC.mdが毎回の分類コンテキストに混入している可能
 - `README.md`(実行手順の追記)
 
 **タスク**
-- [ ] `../agent-trend-data/snapshots/`配下の日付ディレクトリを新しい順に
+- [x] `../agent-trend-data/snapshots/`配下の日付ディレクトリを新しい順に
       2つ選ぶロジックを実装する(1つしかない場合は差分なしとして終了)
-- [ ] 決定的な項目のみを比較対象にする(#30でLLM分類4項目のキャッシュが
+- [x] 決定的な項目のみを比較対象にする(#30でLLM分類4項目のキャッシュが
       導入されるまでは`agent_doc_mentions_repo_structure`等4項目を除外する)
-- [ ] 変化があった`repo`×`項目`×旧値→新値を人間が読めるMarkdown
+      — 対応内容参照。#30がB案で完了したため、単純除外ではなく
+      `agent_doc_llm_cache_key`を使った判別ロジックに変更した
+- [x] 変化があった`repo`×`項目`×旧値→新値を人間が読めるMarkdown
       (`changes.md`)として出力する
-- [ ] スナップショットが1つしかない/差分がない場合の挙動を決める
+- [x] スナップショットが1つしかない/差分がない場合の挙動を決める —
+      対応内容参照
 
 **完了条件**: 直近2回のスナップショットで値が変化した項目がある場合に
 `changes.md`へ正しく出力され、変化がない項目・LLM分類4項目(#30導入前)が
@@ -1538,6 +1543,53 @@ CLAUDE.md/SPEC.mdが毎回の分類コンテキストに混入している可能
 
 **依存**: #24(完了済み、hubへのスナップショット連携)、#30(LLM分類4項目を
 対象から除外する期間の終了条件として関連)
+
+**対応内容(2026-09-26)**: 着手前の設計確認で、Issue原文と食い違う2点を
+ユーザーと協議し、以下の方針(案A+案2)で進めた。
+
+1. **出力先(案A)**: playbookは`agent-trend-radar`に一切関与しない設計
+   (`agent-trend-playbook/CLAUDE.md`)のため、`changes.md`をこのリポジトリ
+   だけに置いても実際にはplaybookから読めない。ハブ(`agent-trend-data`)
+   への公開配線(`sync_to_hub.ps1`/CIワークフローの拡張)は本Issueの
+   スコープ外とし、まず`data/latest/changes.md`(#19/#22と同じ、Claude
+   Project公開用の慣習)に出力するに留めた。ハブへの反映は別途判断が
+   必要(下記「新Issue案」参照)。
+2. **LLM4項目の扱い(案2)**: Issue原文は「#30のキャッシュ導入までは
+   除外」としていたが、#30は「スキップ」ではなくB案(非決定性の検出を
+   可能にする`agent_doc_llm_cache_key`の公開)で完了したため、単純な
+   期限付き除外ではなく、`agent_doc_llm_cache_key`が両スナップショットに
+   存在し値が同じ場合はLLM4項目の変化を非決定性の疑いとして除外、
+   キーが変わっていれば通常の変化として含める、キーがどちらかに
+   存在しない場合(#30より前のスナップショット同士)は無条件で除外する
+   ロジックにした(`diff_snapshots.diff_snapshots`)。
+3. **0/1件・差分なしの場合の挙動**: 比較可能なスナップショットが2件
+   未満の場合はファイルを生成せずメッセージ表示のみで終了する(既存の
+   `changes.md`を誤って上書き・削除しない)。2件あって差分が無い場合は
+   「変化した項目はありませんでした。」という内容の`changes.md`を出力する
+   (空ファイルにはしない)。
+
+**実施内容**: `scripts/diff_snapshots.py`(新規)を実装。`list_snapshot_dates`
+/`select_latest_two_dates`/`load_snapshot`/`diff_snapshots`/
+`format_changes_markdown`/`build_report`の純粋関数群+CLI(`main`)構成。
+LLM分類4項目の判定は`llm_content_analysis.CLASSIFICATION_FIELDS`を再利用
+し、独自の重複リストは作らなかった。README.mdに実行手順を追記した。
+
+**確認結果**:
+- テスト: `tests/test_diff_snapshots.py`を新規15件追加、全135件パス
+  (`uv run pytest -q`)
+- 実データ確認: `uv run scripts/diff_snapshots.py`を実行し、実在する
+  `agent-trend-data/snapshots/2026-09-13`→`2026-09-14`(#30より前、
+  cache keyフィールドなし)を比較。20件の変化を検出し、すべて#25・#28・
+  #29で実際に変更されたと記録済みの値と一致することを確認した(例:
+  `continuedev/continue`の`has_agent_instructions 0→1`[#29]、
+  `getsentry/sentry`の`skills_count 0→28`[#25の#3]、`OpenHands/OpenHands`
+  等の`has_skills_dir 0→1`[#28])。LLM分類4項目の変化は0件で、意図通り
+  除外されていることを確認した。`agent_doc_llm_cache_key`自体が単独の
+  変化行として出力されないことも確認済み(現時点ではこの2スナップショット
+  にはそもそもこのフィールドが存在しないため、フォールバック経路の実証)
+
+**未完のタスク**: なし。ただしハブへの公開配線(下記「新Issue案」)は
+このIssueのスコープ外として見送った。
 
 ---
 

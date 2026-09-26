@@ -114,6 +114,25 @@ GitHub Actions経由の自動化はPAT発行後に切り替える(下記参照)�
 この4フィールドの値が変わっていた場合、それは指示文書の変更ではなく
 LLMの非決定性によるものと判別できる(Issue #30)。
 
+### スナップショット差分レポート(Issue #31)
+
+`agent-trend-data/snapshots/`に蓄積された直近2回分のスナップショットを
+比較し、値が変化した`repo`×項目の一覧を出力する。playbookが記事の候補を
+探す際の入力にすることを想定している。
+
+```
+uv run scripts/diff_snapshots.py
+```
+
+`data/latest/changes.md`に出力される(引数でスナップショットディレクトリ・
+出力先を上書き可能)。比較可能なスナップショットが2件未満の場合は、
+ファイルを生成せずその旨をメッセージ表示して終了する。
+
+LLM分類4項目(`agent_doc_mentions_*`)は、`agent_doc_llm_cache_key`
+(Issue #30)が両スナップショットに存在し値が同じ場合、LLMの非決定性
+による疑わしい変化とみなし除外する。cache keyがどちらかに存在しない
+場合(#30より前のスナップショット同士の比較等)は無条件で除外する。
+
 ### 将来の運用: GitHub Actionsによる自動化(未使用、PAT発行後に有効化)
 
 `.github/workflows/collect-and-publish.yml`に、週次(毎週月曜
