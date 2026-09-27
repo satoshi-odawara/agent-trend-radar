@@ -6,17 +6,21 @@ DEFAULT_DB_PATH = "data/repo_checks.db"
 
 # #4(ファイル存在5項目) + #5(内容分析8項目) + #15(LLM内容分析4項目)
 # + #21(高度なエージェント運用ツール6項目) + #29(agent_doc_count)
+# + #30(agent_doc_llm_cache_key) + #20(ci_workflow_count,
+# agent_doc_code_block_count)
 # has_observability_depは#16で廃止(SPEC.md「廃止した項目とその理由」参照)
 CHECK_COLUMNS = [
     "has_agent_instructions",
     "has_tests",
     "has_eval",
     "has_ci",
+    "ci_workflow_count",
     "has_security_policy",
     "agent_doc_count",
     "agent_doc_char_count",
     "agent_doc_heading_count",
     "agent_doc_has_code_block",
+    "agent_doc_code_block_count",
     "agent_doc_mentions_test",
     "agent_doc_mentions_lint",
     "agent_doc_mentions_security",

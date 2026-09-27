@@ -90,14 +90,30 @@ def test_has_eval_false_when_missing():
     assert checks.has_eval(FakeGitHubClient(), "o/r") is False
 
 
-def test_has_ci_true_when_workflows_dir_exists():
-    client = FakeGitHubClient(existing_paths={".github/workflows"})
+def test_has_ci_true_when_workflow_file_exists():
+    client = FakeGitHubClient(file_paths={".github/workflows/ci.yml"})
     assert checks.has_ci(client, "owner/repo") is True
 
 
 def test_has_ci_false_when_missing():
     client = FakeGitHubClient()
     assert checks.has_ci(client, "owner/repo") is False
+
+
+def test_ci_workflow_count_counts_files_under_workflows_dir():
+    client = FakeGitHubClient(
+        file_paths={".github/workflows/ci.yml", ".github/workflows/release.yml"}
+    )
+    assert checks.ci_workflow_count(client, "owner/repo") == 2
+
+
+def test_ci_workflow_count_zero_when_missing():
+    assert checks.ci_workflow_count(FakeGitHubClient(), "owner/repo") == 0
+
+
+def test_ci_workflow_count_ignores_unrelated_prefix_match():
+    client = FakeGitHubClient(file_paths={".github/workflows-old/ci.yml"})
+    assert checks.ci_workflow_count(client, "owner/repo") == 0
 
 
 def test_has_security_policy_true_when_security_md_exists():

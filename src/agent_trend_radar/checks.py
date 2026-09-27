@@ -6,7 +6,7 @@ from agent_trend_radar.github_client import GitHubClient
 AGENT_INSTRUCTION_PATHS = ["CLAUDE.md", "AGENTS.md", ".cursorrules"]
 TEST_DIR_NAMES = {"tests", "test"}
 EVAL_PATHS = ["evals", "eval"]
-CI_PATHS = [".github/workflows"]
+CI_WORKFLOWS_DIR = ".github/workflows"
 SECURITY_POLICY_PATHS = ["SECURITY.md"]
 SKILLS_DIRS = [".claude/skills", ".agents/skills"]
 COMMANDS_DIR = ".claude/commands"
@@ -39,7 +39,20 @@ def has_eval(client: GitHubClient, repo: str) -> bool:
 
 
 def has_ci(client: GitHubClient, repo: str) -> bool:
-    return _any_path_exists(client, repo, CI_PATHS)
+    return ci_workflow_count(client, repo) > 0
+
+
+def ci_workflow_count(client: GitHubClient, repo: str) -> int:
+    """`.github/workflows/`配下のファイル数。
+
+    `has_ci`は20リポジトリではadopter100%・tool92%とほぼ天井に張り付き
+    比較材料として機能しない(#20)。実データで検証したところ0件
+    (yoheinakajima/babyagi)〜63件(getsentry/sentry)まで分散があり、
+    CI投資の厚みを示す量的指標として使える。既存のTreeキャッシュを
+    再利用するため新規API呼び出しは発生しない。
+    """
+    prefix = f"{CI_WORKFLOWS_DIR}/"
+    return sum(1 for path in client.get_file_paths(repo) if path.startswith(prefix))
 
 
 def has_security_policy(client: GitHubClient, repo: str) -> bool:

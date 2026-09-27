@@ -12,6 +12,8 @@ NUMERIC_COLUMNS = {
     "skills_count",
     "custom_commands_count",
     "mcp_servers_count",
+    "ci_workflow_count",
+    "agent_doc_code_block_count",
 }
 
 META_COLUMNS = ["repo", "segment", "monetization_model"]

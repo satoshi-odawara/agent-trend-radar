@@ -105,7 +105,17 @@ def agent_doc_heading_count(content: str) -> int:
 
 
 def agent_doc_has_code_block(content: str) -> bool:
-    return "```" in content
+    return agent_doc_code_block_count(content) > 0
+
+
+def agent_doc_code_block_count(content: str) -> int:
+    """```で囲まれたコードブロックの数(開き・閉じの組数)。
+
+    `agent_doc_has_code_block`はtool67%・adopter70%(#20)とセグメント間の
+    弁別力が無い。実データで検証したところ0件〜44件(browser-use/browser-use)
+    まで分散があり、指示文書の具体性を示す量的指標として使える。
+    """
+    return content.count("```") // 2
 
 
 def agent_doc_mentions_test(content: str) -> bool:

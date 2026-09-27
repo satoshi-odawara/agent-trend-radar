@@ -125,6 +125,14 @@ def test_agent_doc_has_code_block():
     assert doc_analysis.agent_doc_has_code_block("no code block here") is False
 
 
+def test_agent_doc_code_block_count():
+    assert doc_analysis.agent_doc_code_block_count("no code block here") == 0
+    assert doc_analysis.agent_doc_code_block_count("one ```block``` here") == 1
+    assert (
+        doc_analysis.agent_doc_code_block_count("```a```\n\n```b```\n\n```c```") == 3
+    )
+
+
 def test_agent_doc_mentions_test():
     assert doc_analysis.agent_doc_mentions_test("Run `pytest` before committing") is True
     assert doc_analysis.agent_doc_mentions_test("Run `vitest run`") is True

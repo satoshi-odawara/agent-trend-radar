@@ -122,6 +122,7 @@ owner/repoのGitHub API実データ(スター数・作成日)、および各社�
 | has_tests | tests/ または test/(リポジトリ内の任意の深さ) | テストを備えているか |
 | has_eval | evals/ / eval/ | エージェントの評価を行っているか |
 | has_ci | .github/workflows/ | CI/CDを回しているか |
+| ci_workflow_count | .github/workflows/配下のファイル数 | CI投資の厚み |
 | has_security_policy | SECURITY.md | セキュリティ方針を明示しているか |
 | has_skills_dir | .claude/skills/ または .agents/skills/ | 再利用可能なSkillを定義しているか |
 | skills_count | 両パス直下の子要素数の和集合 | Skill定義の充実度 |
@@ -208,6 +209,19 @@ Zed等が対応している(Web検索で確認)。実データでは以下のパ
 いう対応する標準が存在しないことをWeb調査で確認済みのため対象外(将来
 的に標準が現れた場合は再検討)。
 
+`has_ci`/`agent_doc_has_code_block`は天井/床効果によりセグメント間の
+比較材料として機能しない(Issue #20、`reports/mvp_data_insights_evaluation.md`
+で発見)。20リポジトリ時点でhas_ciはadopter100%・tool90%、
+agent_doc_has_code_blockはtool67%・adopter70%とほぼ差が無く、28
+リポジトリに拡大した2026-09-27時点の再検証でもhas_ciはadopter100%・
+tool92%と同様の結果だった。両項目とも判定ロジック自体に誤りはなく、
+「CI導入はもはや前提条件」という示唆自体には価値があるため、bool値は
+維持しつつ、量的指標`ci_workflow_count`(`.github/workflows/`配下の
+ファイル数)・`agent_doc_code_block_count`(コードブロック数)を追加した。
+実データでそれぞれ0〜63件・0〜44件の分散があることを確認済み(2026-09-27)。
+いずれも既存のTreeキャッシュ・取得済みcontentを再利用するため新規API
+呼び出しは発生しない。
+
 ### 廃止した項目とその理由
 
 `has_observability_dep`(依存にLangSmith/Langfuse等の可観測性パッケージが
@@ -250,6 +264,7 @@ CLAUDE.md/AGENTS.mdがあればそれを使い(両方存在する場合は内容
 | agent_doc_char_count | 内容の充実度(代表文書1件分) | 文字数(数値) |
 | agent_doc_heading_count | 構成の複雑さ | Markdown見出し(`#`で始まる行)の数(数値) |
 | agent_doc_has_code_block | 具体的なコマンド例があるか | \`\`\`コードブロックの有無 |
+| agent_doc_code_block_count | 指示文書の具体性の厚み | \`\`\`で囲まれたコードブロックの数(数値) |
 | agent_doc_mentions_test | テスト実行方法への言及 | キーワード一致(大小文字無視): test, pytest, jest, vitest |
 | agent_doc_mentions_lint | Lint/フォーマットへの言及 | キーワード一致: lint, ruff, eslint, prettier |
 | agent_doc_mentions_security | セキュリティ上の注意点への言及 | キーワード一致: security, secret, credential, vulnerability |

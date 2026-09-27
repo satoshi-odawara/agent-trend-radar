@@ -333,8 +333,10 @@ Issueは「実装型」「調査・検討型」いずれかのテンプレート
 - [ ] #19 データをClaude Projectから参照しやすい公開形式の検討 —
       2026-09-08 実装・実データ生成完了、Claude Project側の接続確認待ち
       (#12中止に伴い新設、詳細は末尾セクション参照)
-- [ ] #20 has_ci / agent_doc_has_code_blockの天井・床効果の見直し
-      (MVP品質評価で発見、詳細は末尾セクション参照)
+- [x] #20 has_ci / agent_doc_has_code_blockの天井・床効果の見直し
+      (MVP品質評価で発見) — 2026-09-27 実装完了。bool値は維持し
+      `ci_workflow_count`/`agent_doc_code_block_count`を追加
+      (詳細は末尾セクション参照)
 - [x] #21 高度なエージェント運用ツール導入の有無チェック項目の追加
       (#15議論中に発見) — 2026-09-13 実装・実データでの反映確認完了
       (詳細は末尾セクション参照)
@@ -909,18 +911,73 @@ segment間の差がほとんどない。両項目とも判定ロジック自体�
 天井/床効果により比較材料としての情報量が乏しいと評価されている。
 
 **タスク**(たたき台、着手時に確定する)
-- [ ] 項目として維持する価値があるか再検討する(「分散がない」こと自体が
+- [x] 項目として維持する価値があるか再検討する(「分散がない」こと自体が
       無価値とは限らない。例えばhas_ciがほぼ全件trueという結果は「CI
-      導入はもはや前提条件」という示唆を持つ)
-- [ ] 廃止する場合、代替の切り口(例: has_ciはワークフロー数・実行内容の
+      導入はもはや前提条件」という示唆を持つ)— 対応内容参照。維持と
+      判断した
+- [x] 廃止する場合、代替の切り口(例: has_ciはワークフロー数・実行内容の
       複雑さ、agent_doc_has_code_blockはコードブロック数・言語種別等)を
-      検討する
-- [ ] 廃止・維持いずれの場合もSPEC.mdの「既知の制限」または「廃止した
+      検討する — 対応内容参照。廃止はせず、量的指標を追加する形にした
+- [x] 廃止・維持いずれの場合もSPEC.mdの「既知の制限」または「廃止した
       項目とその理由」に反映する
 
-**完了条件**: 着手時に別途定義する。
+**完了条件**: SPEC.mdに天井/床効果の事実と対応方針が反映されており、
+新規追加した量的指標について実データで十分な分散があることを確認する。
 
 **依存**: #5(完了済み)、#9(完了済み)
+
+**対応内容(2026-09-27)**: 着手前に、参照レポート(2026-09-07時点・
+20リポジトリ)の主張を現在の28リポジトリ(#38で拡張済み)で再検証した。
+`has_ci`はadopter16/16(100%)・tool11/12(92%)、`agent_doc_has_code_block`
+は指示文書を持つリポジトリのうちadopter8/16(50%)・tool4/8(50%)と、
+いずれも天井/床効果が変わらず残存していることを確認した。
+
+ユーザーと協議の上、**案A(bool値は維持しつつ量的指標を追加)**で
+進めた。案B(何もしない)・案C(bool値を廃止しcountに置き換え)は不採用。
+理由:
+- 実データで代替の切り口(Issue原文がたたき台として提案していた
+  「workflow数」「コードブロック数」)を先に検証したところ、
+  `ci_workflow_count`は0件(yoheinakajima/babyagi)〜63件
+  (getsentry/sentry)、コードブロック数は0件〜44件
+  (browser-use/browser-use)と、いずれも十分な分散があることを確認した
+- 両指標とも既存のTreeキャッシュ・取得済みcontent文字列を再利用でき、
+  新規API呼び出しが発生しない
+- bool値(`has_ci`/`agent_doc_has_code_block`)自体は「CI導入・コード例
+  提示はもはや前提条件」という示唆を持ち、他のコードや既存レポートから
+  参照される可能性もあるため、廃止せず維持するのが最小の変更範囲になる
+
+**実施内容**:
+- `src/agent_trend_radar/checks.py`: `ci_workflow_count`を新設。
+  `has_ci`は`ci_workflow_count(client, repo) > 0`から導出するよう変更し
+  (従来の`path_exists`直接呼び出しからTreeキャッシュ経由に統一)、
+  未使用になった`CI_PATHS`/`_any_path_exists`のCI用途を`CI_WORKFLOWS_DIR`
+  に置き換えた
+- `src/agent_trend_radar/agent_doc_analysis.py`: `agent_doc_code_block_count`
+  を新設(\`\`\`の出現数を2で割った組数)。`agent_doc_has_code_block`は
+  そこから導出するよう変更
+- `src/agent_trend_radar/storage.py`: `CHECK_COLUMNS`に`ci_workflow_count`・
+  `agent_doc_code_block_count`を追加
+- `scripts/collect.py`・`scripts/report.py`: 新項目の呼び出し・
+  `NUMERIC_COLUMNS`追加
+- `SPEC.md`・`agent-trend-data/schema/SCHEMA.md`(v1.4)を更新
+  (チェック項目表への追加、天井/床効果の事実と対応方針を「既知の制限」
+  に記録)
+
+**確認結果**:
+- テスト: 新規7件を追加(`ci_workflow_count`3件、
+  `agent_doc_code_block_count`1件、既存`has_ci`テスト2件を実装変更に
+  合わせて修正)、全158件パス(`uv run pytest -q`)
+- `uv run scripts/check_hub_schema_sync.py ../agent-trend-data/schema/SCHEMA.md`
+  が一致を確認
+- 実データ確認(GITHUB_TOKEN利用、28リポジトリ全件): `data/repo_checks.db`
+  が旧スキーマだったため退避・再作成。収集完了、`data/collect.log`に
+  エラー・警告なし。新項目の実測分布: `ci_workflow_count`はadopter平均
+  27.9件(4〜63件)・tool平均19.7件(0〜43件)、
+  `agent_doc_code_block_count`はadopter平均3.4件(0〜18件)・tool平均
+  4.8件(0〜44件)と、いずれも旧bool値では見えなかったsegment間の
+  分散が確認できた
+
+**未完のタスク**: なし。
 
 ---
 
