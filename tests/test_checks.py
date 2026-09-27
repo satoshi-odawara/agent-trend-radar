@@ -82,12 +82,19 @@ def test_has_tests_false_when_missing():
 
 
 def test_has_eval_true_for_evals_or_eval():
-    assert checks.has_eval(FakeGitHubClient(existing_paths={"evals"}), "o/r") is True
-    assert checks.has_eval(FakeGitHubClient(existing_paths={"eval"}), "o/r") is True
+    assert checks.has_eval(FakeGitHubClient(file_paths={"evals/test.py"}), "o/r") is True
+    assert checks.has_eval(FakeGitHubClient(file_paths={"eval/test.py"}), "o/r") is True
 
 
 def test_has_eval_false_when_missing():
     assert checks.has_eval(FakeGitHubClient(), "o/r") is False
+
+
+def test_has_eval_false_for_nested_only():
+    """ルート直下限定の判定を維持している(#39でTreeキャッシュ経由に
+    変更したが、ネストした場所のevalsは対象外のまま)。"""
+    client = FakeGitHubClient(file_paths={"some/nested/evals/test.py"})
+    assert checks.has_eval(client, "o/r") is False
 
 
 def test_has_ci_true_when_workflow_file_exists():
@@ -117,7 +124,7 @@ def test_ci_workflow_count_ignores_unrelated_prefix_match():
 
 
 def test_has_security_policy_true_when_security_md_exists():
-    client = FakeGitHubClient(existing_paths={"SECURITY.md"})
+    client = FakeGitHubClient(file_paths={"SECURITY.md"})
     assert checks.has_security_policy(client, "owner/repo") is True
 
 
@@ -127,7 +134,7 @@ def test_has_security_policy_false_when_missing():
 
 
 def test_has_skills_dir_true_when_exists():
-    client = FakeGitHubClient(existing_paths={".claude/skills"})
+    client = FakeGitHubClient(immediate_children={".claude/skills": {"foo"}})
     assert checks.has_skills_dir(client, "owner/repo") is True
 
 
@@ -170,7 +177,7 @@ def test_has_skills_dir_true_when_only_agents_skills_exists():
     """`.claude/skills`が存在せず`.agents/skills`のみのケース
     (例: OpenHands/OpenHands, sveltejs/svelte, astral-sh/ruff,
     remix-run/remix)。"""
-    client = FakeGitHubClient(existing_paths={".agents/skills"})
+    client = FakeGitHubClient(immediate_children={".agents/skills": {"foo"}})
     assert checks.has_skills_dir(client, "owner/repo") is True
 
 
@@ -195,7 +202,7 @@ def test_skills_count_unions_both_paths_without_double_counting_overlap():
 
 
 def test_has_custom_commands_true_when_exists():
-    client = FakeGitHubClient(existing_paths={".claude/commands"})
+    client = FakeGitHubClient(file_paths={".claude/commands/deploy.md"})
     assert checks.has_custom_commands(client, "owner/repo") is True
 
 

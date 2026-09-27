@@ -385,6 +385,9 @@ Issueは「実装型」「調査・検討型」いずれかのテンプレート
 - [x] #38 コミュニティ系リポジトリの追加(commercial/communityバランス是正)
       — 2026-09-27 実装完了。8件追加(28件体制)、commercial:community=
       14:14に是正(詳細は末尾セクション参照)
+- [x] #39 冗長なGitHub API呼び出しの削減(collect.pyの実行時間短縮) —
+      2026-09-27 実装完了。4関数を最大6コール/リポジトリ削減、実データで
+      新旧の値が完全一致することを確認(詳細は末尾セクション参照)
 
 ---
 
@@ -2127,3 +2130,82 @@ commercial:community=14:14になっている。追加分の収集が実データ
 **未完のタスク**: なし。hubへの反映(`sync_to_hub.ps1`)は本Issueの
 タスクに含めておらず未実施(ユーザー側で通常のcollect.pyへの運用として
 実施可能)。
+
+---
+
+## #39 冗長なGitHub API呼び出しの削減(collect.pyの実行時間短縮)
+
+**概要**: ユーザーからの「データ収集に時間がかかる」という指摘を受けて
+`checks.py`を調査した結果、`has_eval`・`has_security_policy`・
+`has_skills_dir`・`has_custom_commands`の4関数が、既にキャッシュ済みの
+Treeデータ(または同一リポジトリに対して他の関数が既に計算済みの結果)
+を使わず、`path_exists`経由で個別にContents APIを追加で呼んでいることが
+判明した。#20で`has_ci`を`ci_workflow_count > 0`から導出する形に統一した
+のと同型の見落としで、同じ手法で修正する。挙動(戻り値)は変更しない。
+
+**変更対象ファイル**
+- `src/agent_trend_radar/checks.py`(修正: 4関数の実装をTreeキャッシュ/
+  既存の`*_count`関数経由に変更。戻り値は変更しない)
+- `tests/test_checks.py`(修正: 4関数のテストを新しい実装[`file_paths`/
+  `directory_names`ベース]に合わせて更新。判定結果自体のテストケースは
+  変更しない)
+
+**タスク**
+- [x] `has_eval`を`get_directory_names`(Treeキャッシュ)ベースに変更する
+      (`has_tests`と同じパターン。`evals`/`eval`という名前のディレクトリ
+      が任意の深さに存在するかで判定。既存の`_any_path_exists`によるroot
+      直下限定の判定から、任意の深さの判定に変わる点に注意)—
+      対応内容参照。「挙動は変えない」というユーザー指示と矛盾するため
+      `get_directory_names`(任意の深さ)は採用せず、`get_file_paths`への
+      接頭辞一致(root直下限定を維持)に変更した
+- [x] `has_security_policy`を`get_file_paths`(Treeキャッシュ)による
+      "SECURITY.md"の存在確認に変更する(root直下のみ、既存の判定範囲を
+      維持する)
+- [x] `has_skills_dir`を`skills_count(client, repo) > 0`から導出する形に
+      変更する
+- [x] `has_custom_commands`を`custom_commands_count(client, repo) > 0`
+      から導出する形に変更する
+- [x] 既存テストを新しい実装に合わせて更新し、全件パスを確認する
+- [x] 実データで1リポジトリあたりのAPI呼び出し数が減っていることを
+      確認する(可能であれば実測、難しければ削減されるコール数の理論値の
+      確認で代替する)— 対応内容参照。理論値の確認で代替した
+
+**完了条件**: 4関数の戻り値が既存の判定結果と一致すること(テストで
+確認)、かつ実装がTreeキャッシュ/既存の`*_count`関数を再利用しており
+追加のContents API呼び出しが発生しないことを確認する。
+
+**依存**: #20(完了済み、同型の先例)、#21(完了済み、`skills_count`/
+`custom_commands_count`の実装元)
+
+**対応内容(2026-09-27)**: タスクのたたき台にあった`has_eval`の
+`get_directory_names`案は、ルート直下限定だった従来の判定範囲を
+任意の深さに広げてしまい、「挙動は変えず」というユーザー指示と矛盾する
+ことに気づいたため採用しなかった。代わりに`get_file_paths`(Tree
+キャッシュ)への接頭辞一致に変更し、ルート直下限定の判定範囲を維持した
+(`has_security_policy`も同様に`get_file_paths`によるroot直下限定の
+存在確認に変更)。`has_skills_dir`/`has_custom_commands`は計画通り
+`skills_count`/`custom_commands_count`から導出する形にした。
+
+`has_skills_dir`をシンボリックリンク解決込みの`skills_count`から導出
+すると、理論上「シンボリックリンク自体は存在するが解決先が空」という
+ケースで旧実装(`path_exists`は真)と結果が食い違う可能性があったため、
+実データで新旧の値を突き合わせて検証した(下記「確認結果」参照)。
+
+不要になった`_any_path_exists`ヘルパーを削除した。`GitHubClient.path_exists`
+自体は`checks.py`からは呼ばれなくなったが、公開メソッドとして独自の
+テストを持つため削除は見送った(#39の範囲を超える判断のため)。
+
+**確認結果**:
+- テスト: `tests/test_checks.py`に新規3件・既存7件の修正を含め、全159件
+  パス(`uv run pytest -q`)
+- 実データ回帰確認(GITHUB_TOKEN利用、28リポジトリ全件): 変更前の
+  `data/repo_checks.db`から`has_eval`/`has_security_policy`/
+  `has_skills_dir`/`has_custom_commands`の値を保存し、変更後の再収集と
+  突き合わせたところ、**28リポジトリ全件で完全に一致**した(差分0件)。
+  `data/collect.log`にもエラー・警告なし
+- API呼び出し数の削減(理論値): 1リポジトリあたり最大6コール削減
+  (`has_eval`2・`has_security_policy`1・`has_skills_dir`2・
+  `has_custom_commands`1)。28リポジトリで最大168コール削減(実測での
+  収集時間の計測は行っていない)
+
+**未完のタスク**: なし。

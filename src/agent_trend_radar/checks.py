@@ -14,10 +14,6 @@ SETTINGS_PATH = ".claude/settings.json"
 MCP_CONFIG_PATH = ".mcp.json"
 
 
-def _any_path_exists(client: GitHubClient, repo: str, paths: list[str]) -> bool:
-    return any(client.path_exists(repo, path) for path in paths)
-
-
 def has_agent_instructions(client: GitHubClient, repo: str) -> bool:
     """CLAUDE.md/AGENTS.md/.cursorrulesがリポジトリ内の任意の深さに存在するか。
 
@@ -35,7 +31,15 @@ def has_tests(client: GitHubClient, repo: str) -> bool:
 
 
 def has_eval(client: GitHubClient, repo: str) -> bool:
-    return _any_path_exists(client, repo, EVAL_PATHS)
+    """`evals`/`eval`ディレクトリがリポジトリルート直下に存在するか。
+
+    従来は`path_exists`でルート直下のみを個別にContents API確認していたが
+    (#39)、判定範囲(ルート直下限定)を変えずに、既にキャッシュ済みの
+    Tree(`get_file_paths`)への接頭辞一致に置き換え、追加のAPI呼び出しを
+    無くした。
+    """
+    prefixes = tuple(f"{path}/" for path in EVAL_PATHS)
+    return any(path.startswith(prefixes) for path in client.get_file_paths(repo))
 
 
 def has_ci(client: GitHubClient, repo: str) -> bool:
@@ -56,11 +60,20 @@ def ci_workflow_count(client: GitHubClient, repo: str) -> int:
 
 
 def has_security_policy(client: GitHubClient, repo: str) -> bool:
-    return _any_path_exists(client, repo, SECURITY_POLICY_PATHS)
+    """SECURITY.mdがリポジトリルート直下に存在するか。
+
+    従来は`path_exists`でContents APIを個別確認していたが(#39)、
+    キャッシュ済みのTree(`get_file_paths`)への存在確認に置き換え、
+    追加のAPI呼び出しを無くした。
+    """
+    return not set(SECURITY_POLICY_PATHS).isdisjoint(client.get_file_paths(repo))
 
 
 def has_skills_dir(client: GitHubClient, repo: str) -> bool:
-    return _any_path_exists(client, repo, SKILLS_DIRS)
+    """`skills_count`が既に同じTreeキャッシュ・シンボリックリンク解決を
+    使って計算済みのため、そこから導出する(#39、`has_ci`[#20]と同型)。
+    """
+    return skills_count(client, repo) > 0
 
 
 def skills_count(client: GitHubClient, repo: str) -> int:
@@ -84,7 +97,11 @@ def skills_count(client: GitHubClient, repo: str) -> int:
 
 
 def has_custom_commands(client: GitHubClient, repo: str) -> bool:
-    return client.path_exists(repo, COMMANDS_DIR)
+    """`custom_commands_count`が既に同じTreeキャッシュ・シンボリックリンク
+    解決を使って計算済みのため、そこから導出する(#39、`has_ci`[#20]と
+    同型)。
+    """
+    return custom_commands_count(client, repo) > 0
 
 
 def custom_commands_count(client: GitHubClient, repo: str) -> int:
