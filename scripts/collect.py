@@ -27,10 +27,10 @@ def configure_logging(log_path: str = LOG_PATH) -> None:
     )
 
 
-def run_checks_for_repo(client: GitHubClient, repo: str) -> dict:
+def run_checks_for_repo(client: GitHubClient, repo: str) -> tuple[dict, str | None]:
     content = agent_doc_analysis.fetch_agent_doc_content(client, repo)
-    llm_themes = llm_content_analysis.classify_agent_doc_themes(content)
-    return {
+    llm_themes, model_name = llm_content_analysis.classify_agent_doc_themes(content)
+    checks_result = {
         "has_agent_instructions": checks.has_agent_instructions(client, repo),
         "has_tests": checks.has_tests(client, repo),
         "has_eval": checks.has_eval(client, repo),
@@ -61,6 +61,7 @@ def run_checks_for_repo(client: GitHubClient, repo: str) -> dict:
         "mcp_servers_count": checks.mcp_servers_count(client, repo),
         "agent_doc_llm_cache_key": agent_doc_analysis.representative_doc_cache_key(client, repo),
     }
+    return checks_result, model_name
 
 
 def main() -> None:
@@ -73,15 +74,18 @@ def main() -> None:
     checked_at = datetime.now(timezone.utc).isoformat()
 
     total = len(targets)
+    observed_models: set[str] = set()
     for i, target in enumerate(targets, start=1):
         repo = target["repo"]
         print(f"[{i}/{total}] {repo} ...")
         try:
-            results = run_checks_for_repo(client, repo)
+            results, model_name = run_checks_for_repo(client, repo)
         except Exception as exc:
             print(f"[{i}/{total}] {repo}: ERROR {exc}")
             logger.error("%s: %s", repo, exc)
             continue
+        if model_name:
+            observed_models.add(model_name)
         storage.insert_repo_check(
             conn,
             repo=repo,
@@ -93,7 +97,10 @@ def main() -> None:
         print(f"[{i}/{total}] {repo}: done")
 
     conn.close()
-    llm_content_analysis.write_run_metadata(llm_content_analysis.collect_run_metadata())
+    model_name = ", ".join(sorted(observed_models)) if observed_models else None
+    llm_content_analysis.write_run_metadata(
+        llm_content_analysis.collect_run_metadata(model_name=model_name)
+    )
 
 
 if __name__ == "__main__":

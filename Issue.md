@@ -382,7 +382,9 @@ Issueは「実装型」「調査・検討型」いずれかのテンプレート
 - [x] #34 フィードフォワード/フィードバックの集計ビューの追加
       (agent-trend-playbook調査案R6) — 2026-09-28 実装完了。true率平均への
       集約はせず、分類の対応表のみ追加する方針に変更(詳細は末尾セクション参照)
-- [ ] #35 LLM分類で実際に使用されたモデル名の記録(#30から見送り分)
+- [x] #35 LLM分類で実際に使用されたモデル名の記録(#30から見送り分) —
+      2026-09-28 実装完了。実データで`model_name: "claude-sonnet-5"`が
+      記録されることを確認(詳細は末尾セクション参照)
 - [ ] #36 スナップショット差分レポートのハブへの公開(#31から見送り分)
 - [ ] #37 収集失敗の可視化・追跡(#11から見送り分)
 - [x] #38 コミュニティ系リポジトリの追加(commercial/communityバランス是正)
@@ -2056,23 +2058,56 @@ LLM分類4項目の判定は`llm_content_analysis.CLASSIFICATION_FIELDS`を再�
   `model_name`等を追記)
 
 **タスク**
-- [ ] `_run_claude_cli`のJSON出力(`modelUsage`)からモデル名を取り出す
+- [x] `_run_claude_cli`のJSON出力(`modelUsage`)からモデル名を取り出す
       ヘルパーを追加する
-- [ ] `classify_agent_doc_themes`の戻り値構造を、4項目の分類結果と
+- [x] `classify_agent_doc_themes`の戻り値構造を、4項目の分類結果と
       モデル名を両方返せるように変更する(呼び出し側`collect.py`への
-      影響を確認する)
-- [ ] 1回の収集実行内で20リポジトリ全件のモデル名が一致する前提で
+      影響を確認する)— 対応内容参照。`(themes辞書, モデル名)`のタプルに
+      変更した
+- [x] 1回の収集実行内で20リポジトリ全件のモデル名が一致する前提で
       よいか、異なる場合にどう扱うか(複数値を記録する/警告する等)を
-      着手時に決める
-- [ ] `collect.py`が収集完了後、実際に使われたモデル名を
+      着手時に決める — 対応内容参照。`set`で観測し、複数なら`", "`区切りで
+      連結する方式にした(警告等は追加しない)
+- [x] `collect.py`が収集完了後、実際に使われたモデル名を
       `llm_classification`に含めて記録するようにする
-- [ ] `SPEC.md`・`agent-trend-data/schema/SCHEMA.md`を更新する
+- [x] `SPEC.md`・`agent-trend-data/schema/SCHEMA.md`を更新する
 
 **完了条件**: 実データで収集を実行し、`metrics.json`の`llm_classification`
 に実際に使用されたモデル名(例: `claude-sonnet-5`)が記録されることを
 確認する。
 
 **依存**: #30(完了済み、モデル名記録を見送った経緯)
+
+**対応内容(2026-09-28)**: 着手前の設計確認どおり、`classify_agent_doc_themes`
+の戻り値を`(themes辞書, モデル名)`のタプルに変更し、`collect_run_metadata`
+に`model_name`引数(省略可)を追加した。
+
+**実施内容**:
+- `src/agent_trend_radar/llm_content_analysis.py`: `extract_model_name`
+  ヘルパーを追加(`modelUsage`キーからモデル名を取り出し、複数あれば
+  `", "`区切りで連結)。`classify_agent_doc_themes`の戻り値をタプル化。
+  `collect_run_metadata`が`model_name`引数(省略可)を受け取り、値があれば
+  `model_name`キーに含める(無ければキー自体を省略)
+- `scripts/collect.py`: `run_checks_for_repo`の戻り値を
+  `(checksの辞書, モデル名)`のタプルに変更。`main`で各リポジトリの
+  モデル名を`set`に集約し、`collect_run_metadata(model_name=...)`に
+  渡すようにした
+- `SPEC.md`・`agent-trend-data/schema/SCHEMA.md`(v1.5)を更新
+
+**確認結果**:
+- テスト: `tests/test_llm_content_analysis.py`に新規8件を追加(既存5件も
+  タプル戻り値に合わせて修正)、全189件パス(`uv run pytest -q`)
+- `uv run scripts/check_hub_schema_sync.py`は無変更のまま一致
+  (`llm_classification`は`repos`配下のCHECK_COLUMNSではないため対象外)
+- 実データ確認(GITHUB_TOKEN・claude CLI利用、28リポジトリ全件):
+  `uv run scripts/collect.py`実行後、`data/llm_run_metadata.json`に
+  `"model_name": "claude-sonnet-5"`が記録されることを確認(28リポジトリ
+  全件で単一のモデルに収束し、複数観測時の連結ロジックは実データでは
+  検証できていない、ユニットテストでのみ確認)。
+  `uv run scripts/export_hub_snapshot.py`で`hub_export/metrics.json`の
+  `llm_classification`にも同じ値が反映されることを確認した
+
+**未完のタスク**: なし。
 
 ---
 
