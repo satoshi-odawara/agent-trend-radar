@@ -165,6 +165,36 @@ def test_keyword_matching_is_case_insensitive():
     assert doc_analysis.agent_doc_mentions_tool_usage("SUBAGENT") is True
 
 
+def test_representative_doc_paths_empty_when_no_doc():
+    client = FakeGitHubClient()
+    assert doc_analysis.representative_doc_paths(client, "owner/repo") == []
+
+
+def test_representative_doc_paths_single_file():
+    client = FakeGitHubClient(file_paths={"CLAUDE.md"})
+    assert doc_analysis.representative_doc_paths(client, "owner/repo") == ["CLAUDE.md"]
+
+
+def test_representative_doc_paths_both_files_claude_first():
+    """#40のadoption_datesが「代表指示文書」を1つに決める際、CLAUDE.mdを
+    優先する前提と一致させるため、AGENT_DOC_PATHSの順序(CLAUDE.md優先)で
+    返す。"""
+    client = FakeGitHubClient(file_paths={"CLAUDE.md", "AGENTS.md"})
+    assert doc_analysis.representative_doc_paths(client, "owner/repo") == [
+        "CLAUDE.md",
+        "AGENTS.md",
+    ]
+
+
+def test_representative_doc_paths_uses_representative_directory():
+    client = FakeGitHubClient(
+        file_paths={"extensions/cli/AGENTS.md", "extensions/cli/README.md"},
+    )
+    assert doc_analysis.representative_doc_paths(client, "owner/repo") == [
+        "extensions/cli/AGENTS.md"
+    ]
+
+
 def test_representative_doc_cache_key_empty_when_no_doc():
     client = FakeGitHubClient()
     assert doc_analysis.representative_doc_cache_key(client, "owner/repo") == ""

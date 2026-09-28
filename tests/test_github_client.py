@@ -176,6 +176,86 @@ def test_secondary_rate_limit_wait_is_capped():
     assert sleeps == [github_client_module.MAX_SECONDARY_RATE_LIMIT_WAIT_SECONDS]
 
 
+def test_get_first_commit_date_single_call_when_no_link_header():
+    """コミット数が1件のみ(Linkヘッダーが無い)場合は1コールで完了する(#40)。"""
+    url = (
+        "https://api.github.com/repos/owner/repo/commits?path=.mcp.json&per_page=1"
+    )
+    session = FakeSession(
+        {
+            url: FakeResponse(
+                200,
+                json_data=[{"commit": {"author": {"date": "2026-05-14T20:06:37Z"}}}],
+            )
+        }
+    )
+    client = GitHubClient(token="dummy", session=session)
+
+    date = client.get_first_commit_date("owner/repo", ".mcp.json")
+
+    assert date == "2026-05-14T20:06:37Z"
+    assert session.call_count(url) == 1
+
+
+def test_get_first_commit_date_none_when_path_never_committed():
+    url = (
+        "https://api.github.com/repos/owner/repo/commits?path=.mcp.json&per_page=1"
+    )
+    session = FakeSession({url: FakeResponse(200, json_data=[])})
+    client = GitHubClient(token="dummy", session=session)
+
+    assert client.get_first_commit_date("owner/repo", ".mcp.json") is None
+    assert session.call_count(url) == 1
+
+
+def test_get_first_commit_date_fetches_last_page_when_multiple_commits():
+    """複数コミットがある場合は、Linkヘッダーのrel="last"から最終ページを
+    取得し、そこに含まれる最古のコミットの日付を返す(#40、#33で検証済みの設計)。"""
+    first_url = (
+        "https://api.github.com/repos/owner/repo/commits?path=.claude%2Fskills&per_page=1"
+    )
+    last_url = (
+        "https://api.github.com/repos/owner/repo/commits"
+        "?path=.claude%2Fskills&per_page=1&page=6"
+    )
+    session = FakeSession(
+        {
+            first_url: FakeResponse(
+                200,
+                json_data=[{"commit": {"author": {"date": "2026-09-25T20:21:38Z"}}}],
+                headers={
+                    "Link": (
+                        '<https://api.github.com/repositories/1/commits?path=.claude%2Fskills'
+                        '&per_page=1&page=2>; rel="next", '
+                        '<https://api.github.com/repositories/1/commits?path=.claude%2Fskills'
+                        '&per_page=1&page=6>; rel="last"'
+                    )
+                },
+            ),
+            last_url: FakeResponse(
+                200,
+                json_data=[{"commit": {"author": {"date": "2026-05-14T20:06:37Z"}}}],
+            ),
+        }
+    )
+    client = GitHubClient(token="dummy", session=session)
+
+    date = client.get_first_commit_date("owner/repo", ".claude/skills")
+
+    assert date == "2026-05-14T20:06:37Z"
+    assert session.call_count(first_url) == 1
+    assert session.call_count(last_url) == 1
+
+
+def test_get_first_commit_date_raises_on_unexpected_status():
+    url = "https://api.github.com/repos/owner/repo/commits?path=.mcp.json&per_page=1"
+    session = FakeSession({url: FakeResponse(500)})
+    client = GitHubClient(token="dummy", session=session, sleep=lambda seconds: None)
+
+    with pytest.raises(GitHubClientError):
+        client.get_first_commit_date("owner/repo", ".mcp.json")
+
+
 def test_request_logs_warning_on_each_retry(caplog):
     session = FakeSession(
         {CONTENTS_URL: [requests.exceptions.ConnectionError("boom"), FakeResponse(200, json_data={"type": "file"})]}

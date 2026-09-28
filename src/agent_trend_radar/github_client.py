@@ -1,8 +1,10 @@
 import base64
 import logging
 import os
+import re
 import time
 from typing import Callable
+from urllib.parse import urlencode
 
 import requests
 
@@ -122,6 +124,54 @@ class GitHubClient:
         for entry in self._get_tree_entries(repo):
             if entry.get("type") == "blob" and entry.get("path") == path:
                 return entry.get("sha")
+        return None
+
+    def get_first_commit_date(self, repo: str, path: str) -> str | None:
+        """指定パスが最初にコミットされた日時(ISO 8601)を返す。一度も
+        コミットされていなければNone。
+
+        Commits APIは新しい順にしか返さないため、`per_page=1`で1ページ目を
+        取得し、Linkヘッダーに`rel="last"`が無ければ(コミットが0件または
+        1件)そのまま採用、あれば最終ページ(=最古のコミット)を取得する
+        (#33で実データ検証済みの設計、#40)。ファイル名変更は追跡しない。
+        """
+        owner, name = repo.split("/", 1)
+        base_url = f"{GITHUB_API_BASE}/repos/{owner}/{name}/commits"
+
+        query = urlencode({"path": path, "per_page": 1})
+        response = self._request(f"{base_url}?{query}")
+        if response.status_code != 200:
+            raise GitHubClientError(
+                f"GitHub APIエラー: {repo}/{path}のコミット取得 -> {response.status_code}"
+            )
+        commits = response.json()
+        if not commits:
+            return None
+
+        last_page = self._extract_last_page(response.headers.get("Link"))
+        if last_page is None:
+            return commits[0]["commit"]["author"]["date"]
+
+        query = urlencode({"path": path, "per_page": 1, "page": last_page})
+        response = self._request(f"{base_url}?{query}")
+        if response.status_code != 200:
+            raise GitHubClientError(
+                f"GitHub APIエラー: {repo}/{path}のコミット取得(最終ページ) -> {response.status_code}"
+            )
+        commits = response.json()
+        return commits[0]["commit"]["author"]["date"] if commits else None
+
+    @staticmethod
+    def _extract_last_page(link_header: str | None) -> int | None:
+        """`Link`ヘッダーから`rel="last"`のpage番号を取り出す。無ければNone。"""
+        if not link_header:
+            return None
+        for part in link_header.split(","):
+            if 'rel="last"' not in part:
+                continue
+            match = re.search(r"[?&]page=(\d+)", part)
+            if match:
+                return int(match.group(1))
         return None
 
     def _get_tree_entries(self, repo: str) -> list[dict]:

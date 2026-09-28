@@ -133,6 +133,25 @@ LLM分類4項目(`agent_doc_mentions_*`)は、`agent_doc_llm_cache_key`
 による疑わしい変化とみなし除外する。cache keyがどちらかに存在しない
 場合(#30より前のスナップショット同士の比較等)は無条件で除外する。
 
+### 規約ファイル初出コミット日の計測(Issue #33, #40)
+
+指示文書・Skills・Commands・`.claude/settings.json`・`.mcp.json`が各
+リポジトリで最初にコミットされた日付を計測する。「機能がリリースされて
+から実プロジェクトで採用されるまでの時間差」を示す材料にすることを
+想定している。週次`collect.py`には組み込まない、手動実行の一回限りの
+スクリプト。
+
+```
+uv run scripts/compute_adoption_dates.py
+```
+
+`data/adoption_dates.json`(差分キャッシュ、コミット対象)と
+`data/latest/adoption_dates.md`(人間が読める一覧)を出力する。初出日が
+既に判明している組は再度APIを呼ばない。まだ採用されていない組は、将来の
+採用を検知できるよう毎回軽く(1コール)再確認する。ファイル名の変更は
+追跡できない。`.claude/settings.json`/`.mcp.json`は「ファイル自体の初出」
+であり、「hooksキー/MCPサーバーがいつ追加されたか」までは捕捉できない。
+
 ### 将来の運用: GitHub Actionsによる自動化(未使用、PAT発行後に有効化)
 
 `.github/workflows/collect-and-publish.yml`に、週次(毎週月曜

@@ -64,6 +64,27 @@ def fetch_agent_doc_content(client: GitHubClient, repo: str) -> str:
     return "\n".join(parts)
 
 
+def representative_doc_paths(client: GitHubClient, repo: str) -> list[str]:
+    """代表文書として実際に存在するパスの一覧を返す(存在するものだけ、
+    AGENT_DOC_PATHSの順序[CLAUDE.md優先]で並ぶ)。
+
+    `fetch_agent_doc_content`/`representative_doc_cache_key`と同じ選定
+    ロジック(ルート優先、無ければ最も浅いディレクトリ)を使う。文書が
+    見つからない場合は空リストを返す。個々のファイルの初出コミット日を
+    追跡する#40で、どのパスを見ればよいかを知るために切り出した。
+    """
+    paths = find_agent_doc_paths(client, repo)
+    if not paths:
+        return []
+    directory = _representative_directory(paths)
+    file_paths = client.get_file_paths(repo)
+    return [
+        candidate
+        for filename in AGENT_DOC_PATHS
+        if (candidate := (f"{directory}/{filename}" if directory else filename)) in file_paths
+    ]
+
+
 def representative_doc_cache_key(client: GitHubClient, repo: str) -> str:
     """`fetch_agent_doc_content`が読み込む代表文書の入力が前回から変わったかを
     検知するためのキー(パス+blob SHAの組を連結した文字列)。
@@ -74,17 +95,10 @@ def representative_doc_cache_key(client: GitHubClient, repo: str) -> str:
     `GitHubClient`が既にキャッシュ済みのTreeから取り出すため、新規API
     呼び出しは発生しない。文書が見つからない場合は空文字列を返す。
     """
-    paths = find_agent_doc_paths(client, repo)
-    if not paths:
-        return ""
-    directory = _representative_directory(paths)
-    file_paths = client.get_file_paths(repo)
-
-    entries = []
-    for filename in AGENT_DOC_PATHS:
-        path = f"{directory}/{filename}" if directory else filename
-        if path in file_paths:
-            entries.append(f"{path}:{client.get_file_sha(repo, path)}")
+    entries = [
+        f"{path}:{client.get_file_sha(repo, path)}"
+        for path in representative_doc_paths(client, repo)
+    ]
     return "|".join(entries)
 
 

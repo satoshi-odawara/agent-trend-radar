@@ -1,0 +1,222 @@
+{
+  "Aider-AI/aider": {
+    ".agents/skills": null,
+    ".claude/commands": null,
+    ".claude/settings.json": null,
+    ".claude/skills": null,
+    ".mcp.json": null
+  },
+  "OpenHands/OpenHands": {
+    ".agents/skills": "2026-03-03T21:15:55Z",
+    ".claude/commands": null,
+    ".claude/settings.json": null,
+    ".claude/skills": null,
+    ".mcp.json": null,
+    "AGENTS.md": "2026-01-13T15:53:14Z"
+  },
+  "Significant-Gravitas/AutoGPT": {
+    ".agents/skills": "2026-04-01T09:08:51Z",
+    ".claude/commands": null,
+    ".claude/settings.json": "2026-04-03T07:16:36Z",
+    ".claude/skills": "2026-01-16T16:40:58Z",
+    ".mcp.json": null,
+    "CLAUDE.md": "2026-04-01T09:08:51Z"
+  },
+  "apache/airflow": {
+    ".agents/skills": "2026-06-07T08:07:34Z",
+    ".claude/commands": null,
+    ".claude/settings.json": null,
+    ".claude/skills": "2026-04-25T18:23:43Z",
+    ".mcp.json": null,
+    "CLAUDE.md": "2026-02-25T02:56:25Z"
+  },
+  "astral-sh/ruff": {
+    ".agents/skills": "2026-05-27T21:02:29Z",
+    ".claude/commands": null,
+    ".claude/settings.json": "2026-01-22T16:57:01Z",
+    ".claude/skills": null,
+    ".mcp.json": null,
+    "CLAUDE.md": "2026-01-04T20:00:31Z"
+  },
+  "babel/babel": {
+    ".agents/skills": null,
+    ".claude/commands": null,
+    ".claude/settings.json": null,
+    ".claude/skills": null,
+    ".mcp.json": null,
+    "AGENTS.md": "2026-08-16T05:41:29Z"
+  },
+  "browser-use/browser-use": {
+    ".agents/skills": null,
+    ".claude/commands": null,
+    ".claude/settings.json": null,
+    ".claude/skills": null,
+    ".mcp.json": null,
+    "CLAUDE.md": "2025-05-25T10:39:17Z"
+  },
+  "cline/cline": {
+    ".agents/skills": "2026-02-24T00:31:32Z",
+    ".claude/commands": "2025-12-05T23:43:31Z",
+    ".claude/settings.json": "2025-12-22T06:22:35Z",
+    ".claude/skills": "2026-05-14T20:06:37Z",
+    ".mcp.json": null,
+    "AGENTS.md": "2026-07-24T02:26:10Z"
+  },
+  "colinhacks/zod": {
+    ".agents/skills": null,
+    ".claude/commands": null,
+    ".claude/settings.json": null,
+    ".claude/skills": "2026-08-08T21:37:07Z",
+    ".mcp.json": "2026-06-10T17:17:29Z",
+    "CLAUDE.md": "2025-08-23T06:45:27Z"
+  },
+  "continuedev/continue": {
+    ".agents/skills": null,
+    ".claude/commands": null,
+    ".claude/settings.json": "2025-08-05T20:57:45Z",
+    ".claude/skills": "2026-02-13T17:25:35Z",
+    ".mcp.json": null,
+    "extensions/cli/AGENTS.md": "2025-08-21T00:19:56Z"
+  },
+  "crewAIInc/crewAI": {
+    ".agents/skills": null,
+    ".claude/commands": null,
+    ".claude/settings.json": null,
+    ".claude/skills": null,
+    ".mcp.json": null,
+    "AGENTS.md": "2026-06-17T15:56:59Z"
+  },
+  "getsentry/sentry": {
+    ".agents/skills": "2026-02-20T20:15:06Z",
+    ".claude/commands": "2025-07-24T18:15:23Z",
+    ".claude/settings.json": "2025-07-24T18:15:23Z",
+    ".claude/skills": "2026-01-13T15:53:25Z",
+    ".mcp.json": "2025-07-24T18:15:23Z",
+    "CLAUDE.md": "2025-06-17T16:54:03Z"
+  },
+  "jupyterlab/jupyterlab": {
+    ".agents/skills": null,
+    ".claude/commands": null,
+    ".claude/settings.json": null,
+    ".claude/skills": null,
+    ".mcp.json": null,
+    "AGENTS.md": "2026-01-27T10:16:20Z"
+  },
+  "langchain-ai/langchain": {
+    ".agents/skills": null,
+    ".claude/commands": null,
+    ".claude/settings.json": null,
+    ".claude/skills": null,
+    ".mcp.json": "2025-10-22T15:50:35Z",
+    "AGENTS.md": "2025-09-24T05:02:14Z"
+  },
+  "microsoft/autogen": {
+    ".agents/skills": null,
+    ".claude/commands": null,
+    ".claude/settings.json": null,
+    ".claude/skills": null,
+    ".mcp.json": null
+  },
+  "mudler/LocalAI": {
+    ".agents/skills": null,
+    ".claude/commands": null,
+    ".claude/settings.json": null,
+    ".claude/skills": null,
+    ".mcp.json": null,
+    "CLAUDE.md": "2026-02-21T18:03:49Z"
+  },
+  "nodejs/node": {
+    ".agents/skills": null,
+    ".claude/commands": null,
+    ".claude/settings.json": null,
+    ".claude/skills": null,
+    ".mcp.json": null,
+    "AGENTS.md": "2026-08-22T23:01:29Z"
+  },
+  "nuxt/nuxt": {
+    ".agents/skills": null,
+    ".claude/commands": null,
+    ".claude/settings.json": null,
+    ".claude/skills": null,
+    ".mcp.json": null,
+    "CLAUDE.md": "2026-08-16T19:29:17Z"
+  },
+  "oobabooga/text-generation-webui": {
+    ".agents/skills": null,
+    ".claude/commands": null,
+    ".claude/settings.json": null,
+    ".claude/skills": null,
+    ".mcp.json": null
+  },
+  "oven-sh/bun": {
+    ".agents/skills": null,
+    ".claude/commands": "2025-06-25T10:20:22Z",
+    ".claude/settings.json": "2025-10-04T12:25:30Z",
+    ".claude/skills": "2025-12-25T07:37:26Z",
+    ".mcp.json": null,
+    "CLAUDE.md": "2025-06-24T12:09:23Z"
+  },
+  "pandas-dev/pandas": {
+    ".agents/skills": null,
+    ".claude/commands": null,
+    ".claude/settings.json": null,
+    ".claude/skills": null,
+    ".mcp.json": null,
+    "AGENTS.md": "2025-11-13T21:14:16Z"
+  },
+  "python/cpython": {
+    ".agents/skills": null,
+    ".claude/commands": null,
+    ".claude/settings.json": null,
+    ".claude/skills": null,
+    ".mcp.json": null,
+    "AGENTS.md": "2026-09-03T22:20:52Z"
+  },
+  "rails/rails": {
+    ".agents/skills": null,
+    ".claude/commands": null,
+    ".claude/settings.json": null,
+    ".claude/skills": null,
+    ".mcp.json": null,
+    "AGENTS.md": "2025-10-23T18:36:26Z"
+  },
+  "remix-run/remix": {
+    ".agents/skills": "2026-03-13T21:05:41Z",
+    ".claude/commands": null,
+    ".claude/settings.json": null,
+    ".claude/skills": null,
+    ".mcp.json": null,
+    "CLAUDE.md": "2025-07-15T14:28:37Z"
+  },
+  "supabase/supabase": {
+    ".agents/skills": "2026-02-11T08:50:11Z",
+    ".claude/commands": null,
+    ".claude/settings.json": "2026-01-21T18:41:45Z",
+    ".claude/skills": "2026-01-30T12:57:44Z",
+    ".mcp.json": "2026-03-11T09:09:36Z",
+    "CLAUDE.md": "2026-09-03T13:58:29Z"
+  },
+  "sveltejs/svelte": {
+    ".agents/skills": "2026-04-02T17:49:23Z",
+    ".claude/commands": null,
+    ".claude/settings.json": null,
+    ".claude/skills": null,
+    ".mcp.json": null,
+    "AGENTS.md": "2026-04-02T17:49:23Z"
+  },
+  "vercel/next.js": {
+    ".agents/skills": "2026-02-16T17:32:27Z",
+    ".claude/commands": "2026-01-05T12:32:27Z",
+    ".claude/settings.json": null,
+    ".claude/skills": "2026-01-22T08:11:27Z",
+    ".mcp.json": null,
+    "AGENTS.md": "2026-01-05T14:52:09Z"
+  },
+  "yoheinakajima/babyagi": {
+    ".agents/skills": null,
+    ".claude/commands": null,
+    ".claude/settings.json": null,
+    ".claude/skills": null,
+    ".mcp.json": null
+  }
+}

@@ -391,7 +391,10 @@ Issueは「実装型」「調査・検討型」いずれかのテンプレート
 - [x] #39 冗長なGitHub API呼び出しの削減(collect.pyの実行時間短縮) —
       2026-09-27 実装完了。4関数を最大6コール/リポジトリ削減、実データで
       新旧の値が完全一致することを確認(詳細は末尾セクション参照)
-- [ ] #40 規約ファイル初出コミット日の計測スクリプト実装(#33の設計に基づく)
+- [x] #40 規約ファイル初出コミット日の計測スクリプト実装(#33の設計に基づく)
+      — 2026-09-28 実装完了。実データで164組(確定58・未採用106)を計測、
+      差分キャッシュの効果(確定済みへの再呼び出し0件)を実証
+      (詳細は末尾セクション参照)
 
 ---
 
@@ -2335,22 +2338,25 @@ Treeデータ(または同一リポジトリに対して他の関数が既に計
 - `README.md`(実行手順の追記)
 
 **タスク**
-- [ ] `GitHubClient`(または新規ヘルパー)に、指定パスの初出コミット日を
+- [x] `GitHubClient`(または新規ヘルパー)に、指定パスの初出コミット日を
       1〜2コールで取得する関数を実装する(#33で検証済みの設計: 1件目は
       `per_page=1`、Linkヘッダーに`rel="last"`が無ければそのまま採用、
       あれば最終ページを再取得)
-- [ ] 対象パス6件(代表指示文書のパス[#30と同じ選定ロジックで解決]、
+- [x] 対象パス6件(代表指示文書のパス[#30と同じ選定ロジックで解決]、
       `.claude/skills`、`.agents/skills`、`.claude/commands`、
       `.claude/settings.json`、`.mcp.json`)を定義する
-- [ ] 差分キャッシュ(`data/adoption_dates.json`)の読み書きを実装する。
+- [x] 差分キャッシュ(`data/adoption_dates.json`)の読み書きを実装する。
       リポジトリ×パスの組が既に記録済みならAPIを呼ばず再利用し、無い
       組だけ新規に取得して追記する
-- [ ] `scripts/compute_adoption_dates.py`を実装し、
+- [x] `scripts/compute_adoption_dates.py`を実装し、
       `data/latest/adoption_dates.md`(人間が読める一覧)を出力する
-- [ ] 実データで28リポジトリ×6パス分を実行し、キャッシュファイルと
+- [x] 実データで28リポジトリ×6パス分を実行し、キャッシュファイルと
       一覧が正しく生成されることを確認する
-- [ ] 2回目の実行(全件キャッシュ済みの状態)でAPI呼び出しが発生しない
-      ことを確認する(差分キャッシュの効果確認)
+- [x] 2回目の実行(全件キャッシュ済みの状態)でAPI呼び出しが発生しない
+      ことを確認する(差分キャッシュの効果確認)— 対応内容参照。「全件
+      キャッシュ済み」は実データでは成立しない(未採用の組が多数残る)
+      ため、着手前の確認どおり「確定済みの組への呼び出しが無いこと」を
+      実データで直接検証した
 
 **完了条件**: 実データで28リポジトリ×6パス分の初出コミット日が
 `data/adoption_dates.json`・`data/latest/adoption_dates.md`に出力され、
@@ -2359,3 +2365,50 @@ Treeデータ(または同一リポジトリに対して他の関数が既に計
 **依存**: #33(完了済み、本Issueの設計元)、#11(完了済み、リトライ・
 タイムアウト機構の再利用)、#30(完了済み、代表指示文書パス選定ロジックの
 再利用元)
+
+**対応内容(2026-09-28)**: 着手前の設計確認で合意した通り、「キャッシュ
+済み」の意味を「確定した日付(non-null)は永続キャッシュ、未採用(null)
+は将来の採用を検知するため毎回軽く[1コール]再確認する」という設計で
+実装した。
+
+**実施内容**:
+- `src/agent_trend_radar/github_client.py`: `get_first_commit_date`を
+  追加。`_request`を再利用するため#11のリトライ・タイムアウトが
+  そのまま効く。Linkヘッダーから`rel="last"`のページ番号を取り出す
+  `_extract_last_page`も追加
+- `src/agent_trend_radar/agent_doc_analysis.py`: `representative_doc_cache_key`
+  から代表文書のパス一覧を返す`representative_doc_paths`を切り出した
+  (#40が同じ選定ロジックを再利用するための最小限のリファクタ、
+  既存の`representative_doc_cache_key`のテストは変更なしで全件パス)
+- `src/agent_trend_radar/adoption_dates.py`(新規): 対象パス解決
+  (`target_paths`)、差分キャッシュ更新(`update_cache_for_repo`、
+  non-nullはスキップ・nullは再確認)、キャッシュ読み書き
+  (`load_cache`/`save_cache`)、レポート生成(`build_report`)
+- `scripts/compute_adoption_dates.py`(新規): 28リポジトリ分を
+  `update_cache_for_repo`で処理し、`data/adoption_dates.json`と
+  `data/latest/adoption_dates.md`を出力する
+- `README.md`に実行手順を追記
+
+**確認結果**:
+- テスト: 新規23件(`test_github_client.py`4件、`test_agent_doc_analysis.py`
+  3件、`test_adoption_dates.py`8件、`test_compute_adoption_dates.py`2件、
+  ほか関連修正)を追加、全183件パス(`uv run pytest -q`)
+- 実データ確認(GITHUB_TOKEN利用、28リポジトリ×最大6パス):
+  `uv run scripts/compute_adoption_dates.py`を実行し、全28リポジトリが
+  正常完了。`data/adoption_dates.json`(164組、うち確定58組・未採用106組)、
+  `data/latest/adoption_dates.md`を生成した。実データの例:
+  `cline/cline`の`.claude/skills`初出は2026-05-14T20:06:37Z(#33の実験と
+  同じ値、コミットメッセージ"feat: add cline-sdk skill for Claude Code
+  agents"と一致)
+- **差分キャッシュの効果を実データで直接検証**: 生成済みキャッシュに
+  対して2回目の`update_cache_for_repo`を全リポジトリ分実行し、API呼び
+  出しをカウントするラッパーで計測した。結果、呼び出しは**未採用106組
+  のみ106回**発生し、**確定済み58組への呼び出しは0回**、確定済みの値も
+  変化なし(この検証はキャッシュファイルへの書き込みを伴わない、確認
+  専用の実行)
+- `uv run scripts/check_hub_schema_sync.py`は無変更のまま一致(本Issueは
+  CHECK_COLUMNSを変更していないため対象外)
+
+**未完のタスク**: なし。`compute_adoption_dates.py`は`collect.py`のような
+エラーログファイル出力(#11)を持たない(本Issueのタスクに含まれておらず、
+実行中にエラーも発生しなかったため未対応)。必要であれば別Issueで検討。
