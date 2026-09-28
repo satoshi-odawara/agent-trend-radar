@@ -53,3 +53,52 @@ def test_render_boolean_stats_excludes_text_columns():
 def test_format_cell_renders_text_column_as_raw_string():
     assert report.format_cell("agent_doc_llm_cache_key", "CLAUDE.md:sha1") == "CLAUDE.md:sha1"
     assert report.format_cell("agent_doc_llm_cache_key", "") == ""
+
+
+def test_render_mcp_derived_stats_true_when_count_positive():
+    rows = [
+        _make_row("a/a", "tool", "commercial_saas", mcp_servers_count=2),
+        _make_row("b/b", "tool", "commercial_saas", mcp_servers_count=0),
+    ]
+    output = report.render_mcp_derived_stats(rows)
+    assert "## has_mcp_servers" in output
+    assert "| tool | commercial_saas | 2 | 1 | 50% |" in output
+
+
+def test_render_ff_fb_classification_lists_feedforward_columns():
+    output = report.render_ff_fb_classification()
+    assert "### フィードフォワード" in output
+    for column in report.FEEDFORWARD_COLUMNS:
+        assert f"- {column}" in output
+
+
+def test_render_ff_fb_classification_lists_feedback_columns():
+    output = report.render_ff_fb_classification()
+    assert "### フィードバック" in output
+    for column in report.FEEDBACK_COLUMNS:
+        assert f"- {column}" in output
+
+
+def test_ff_fb_columns_have_no_overlap_or_duplicates():
+    assert set(report.FEEDFORWARD_COLUMNS).isdisjoint(report.FEEDBACK_COLUMNS)
+    assert len(report.FEEDFORWARD_COLUMNS) == len(set(report.FEEDFORWARD_COLUMNS))
+    assert len(report.FEEDBACK_COLUMNS) == len(set(report.FEEDBACK_COLUMNS))
+
+
+def test_feedback_columns_are_real_check_columns():
+    """has_mcp_serversはmcp_servers_countからの派生のためCHECK_COLUMNSには
+    存在しない特例。それ以外は実在のCHECK_COLUMNSであること。"""
+    for column in report.FEEDBACK_COLUMNS:
+        assert column in storage.CHECK_COLUMNS
+    for column in report.FEEDFORWARD_COLUMNS:
+        if column == "has_mcp_servers":
+            continue
+        assert column in storage.CHECK_COLUMNS
+
+
+def test_render_stats_includes_new_sections_without_breaking_existing():
+    rows = [_make_row("a/a", "tool", "commercial_saas", has_ci=True, mcp_servers_count=1)]
+    output = report.render_stats(rows)
+    assert "## has_ci" in output
+    assert "## has_mcp_servers" in output
+    assert "## フィードフォワード/フィードバックの分類" in output

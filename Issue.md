@@ -377,8 +377,9 @@ Issueは「実装型」「調査・検討型」いずれかのテンプレート
       (詳細は末尾セクション参照)
 - [ ] #33 規約ファイル初出コミット日による採用ラグの計測方法の検討
       (agent-trend-playbook調査案R5)
-- [ ] #34 フィードフォワード/フィードバックの集計ビューの追加
-      (agent-trend-playbook調査案R6)
+- [x] #34 フィードフォワード/フィードバックの集計ビューの追加
+      (agent-trend-playbook調査案R6) — 2026-09-28 実装完了。true率平均への
+      集約はせず、分類の対応表のみ追加する方針に変更(詳細は末尾セクション参照)
 - [ ] #35 LLM分類で実際に使用されたモデル名の記録(#30から見送り分)
 - [ ] #36 スナップショット差分レポートのハブへの公開(#31から見送り分)
 - [ ] #37 収集失敗の可視化・追跡(#11から見送り分)
@@ -1906,22 +1907,74 @@ LLM分類4項目の判定は`llm_content_analysis.CLASSIFICATION_FIELDS`を再�
 - `tests/test_report.py`(修正)
 
 **タスク**
-- [ ] 既存項目をフィードフォワード群(`has_agent_instructions`、
+- [x] 既存項目をフィードフォワード群(`has_agent_instructions`、
       `has_skills_dir`/`skills_count`、`has_custom_commands`/
       `custom_commands_count`、`mcp_servers_count`等)とフィードバック群
       (`has_tests`、`has_eval`、`has_ci`、`has_hooks_config`等)に分類する
       対応表を定義する(#20で天井/床効果が指摘されている`has_ci`を
-      どちらに含めるか、既存議論と矛盾しないか確認する)
-- [ ] `--format stats`に群別の集計(例: 群別true率平均、segment×
-      monetization_model別)を追加する
-- [ ] 既存の`--format stats`出力(項目別集計)を壊さないことを確認する
+      どちらに含めるか、既存議論と矛盾しないか確認する)— 対応内容参照。
+      各項目の追加経緯(#4/#5/#15/#21/#29)を調査した上で分類を確定した
+- [x] `--format stats`に群別の集計(例: 群別true率平均、segment×
+      monetization_model別)を追加する — 対応内容参照。「true率平均」
+      という単一数値への集約はせず、分類の対応表のみを追加する方針に
+      変更した
+- [x] 既存の`--format stats`出力(項目別集計)を壊さないことを確認する
 
 **完了条件**: `--format stats`で既存の項目別集計に加え、フィードフォワード
 /フィードバック群別の集計が出力され、既存テストに加えて群分類のテストが
 通ることを確認する。
 
-**依存**: #20(未着手、`has_ci`等の解釈と関連)、#21(完了済み、群分類の
+**依存**: #20(完了済み、`has_ci`等の解釈と関連)、#21(完了済み、群分類の
 対象項目の多くがここで追加されたもの)
+
+**対応内容(2026-09-28)**: 着手前の設計確認で、当初「フィードフォワード/
+フィードバックそれぞれのtrue率平均を1つの数値に集約する」設計を提案した
+が、ユーザーから「なぜ1つの平均に混ぜようとしているのか」という指摘を
+受け、以下の経緯で方針を変更した。
+
+1. Issue原文の分類例(「指示文書・skills・commands・MCP」対
+   「tests・CI・hooks・eval」)は「等」を含み厳密ではなかったため、
+   `agent_doc_mentions_*`(9項目)・`agent_doc_has_code_block`を含める
+   か検討するにあたり、Issue.mdで各フィールドの追加経緯を調査した。
+   結果、`agent_doc_mentions_*`/`agent_doc_has_code_block`は#5「指示
+   文書の中身を一段深く見るため」という理由で追加されており、指示文書
+   自体が定義上「事前に指示するもの」である以上、その内容を見る指標も
+   フィードフォワード側に含めるのが自然と判断した。一方
+   `has_security_policy`(想定読者が人間の研究者・報告者でエージェント
+   向けではない)と`agent_doc_count`(#29でモノレポ傾向の代理指標として
+   追加、この軸と無関係)は対象外とした
+2. `mcp_servers_count`に対応する真偽値列がCHECK_COLUMNSに無いため、
+   `mcp_servers_count > 0`を`has_mcp_servers`として派生させ
+   フィードフォワードに含めた(ユーザー承認済み)
+3. 上記の結果、フィードフォワード14項目・フィードバック4項目という
+   不均衡な分類になった。これを1つの「true率平均」に集約すると、
+   実際のツール投資(has_skills_dir等)と指示文書内のキーワード言及
+   (agent_doc_mentions_*)という性質の異なるシグナルが混ざり、
+   解釈を誤らせる懸念があるとユーザーに指摘され、**平均への集約はせず、
+   各項目の既存のtrue率セクションはそのまま維持し、末尾に分類の対応表
+   のみを追加する**方針に変更した
+
+**実施内容**:
+- `scripts/report.py`: `FEEDFORWARD_COLUMNS`・`FEEDBACK_COLUMNS`定数を
+  追加。`render_boolean_stats`の集計ロジックを`_render_boolean_section`
+  として切り出し(重複排除)、`render_mcp_derived_stats`(`has_mcp_servers`
+  を派生させ既存と同形式で出力)・`render_ff_fb_classification`(分類の
+  対応表のみを出力、数値集約はしない)を新設。`render_stats`から両方を
+  追加で呼び出す
+
+**確認結果**:
+- テスト: `tests/test_report.py`に新規7件を追加、全165件パス
+  (`uv run pytest -q`)
+- 実データ確認(`uv run scripts/report.py --format stats`): 既存の
+  項目別セクション(`## has_ci`等)がそのまま出力され、末尾に
+  `## has_mcp_servers(mcp_servers_countの派生)`と
+  `## フィードフォワード/フィードバックの分類`が追加されていることを
+  確認した
+
+**未完のタスク**: なし。`data/latest/stats.md`(`publish.py`が生成する
+コミット対象の成果物)は本Issueでは再生成していない(`publish.py`は
+本Issueの変更対象ファイルに含めていないため)。次回`publish.py`実行時に
+新セクションが反映される。
 
 ---
 
